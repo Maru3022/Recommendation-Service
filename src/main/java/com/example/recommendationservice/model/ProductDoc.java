@@ -24,4 +24,6 @@ public class ProductDoc {
     private String category;
 
     private Double price;
+
+    private String imageUrl;
 }

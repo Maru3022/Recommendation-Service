@@ -1,32 +1,47 @@
 package com.example.recommendationservice.service;
 
 import com.example.recommendationservice.model.ProductDoc;
+import com.example.recommendationservice.model.RecommendationResponse;
 import com.example.recommendationservice.repository.ProductSearchRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 @Service
 @RequiredArgsConstructor
 public class RecommendationService {
 
+    @Autowired
     private final ProductSearchRepository productRepository;
     private final RedisTemplate<String, Object> redisTemplate;
 
-    public List<ProductDoc> getRecommendations(String userId){
-        String favoriteCategory = (String) redisTemplate.opsForValue().get("user: " + userId + ":fav_category");
+    public RecommendationResponse getRecommendations(String userId, int page, int size) {
 
-        if(favoriteCategory != null){
-            return productRepository.findByCategory(favoriteCategory);
+        String favoriteCategory =
+                (String) redisTemplate.opsForValue()
+                        .get("user:" + userId + ":fav_category");
+
+        Pageable pageable = PageRequest.of(page, size);
+
+        Page<ProductDoc> productDocPage;
+
+        if (favoriteCategory != null) {
+            productDocPage =
+                    productRepository.findByCategory(favoriteCategory, pageable);
+        } else {
+            productDocPage =
+                    productRepository.findAll(pageable);
         }
 
-        return StreamSupport.stream(productRepository.findAll().spliterator(),false)
-                .limit(10)
-                .collect(Collectors.toList());
+        return new RecommendationResponse(
+                productDocPage.getContent(),
+                productDocPage.getNumber(),
+                productDocPage.getTotalElements(),
+                productDocPage.hasNext()
+        );
     }
-
 }
