@@ -4,6 +4,7 @@ import com.example.recommendationservice.model.ProductDoc;
 import com.example.recommendationservice.model.RecommendationResponse;
 import com.example.recommendationservice.repository.ProductSearchRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class RecommendationService {
 
     @Autowired
@@ -20,7 +22,7 @@ public class RecommendationService {
     private final RedisTemplate<String, Object> redisTemplate;
 
     public RecommendationResponse getRecommendations(String userId, int page, int size) {
-
+        log.debug("Fetching recommendation for UserID: {} (Page: {}, Size: {})",userId,page,size);
         String favoriteCategory =
                 (String) redisTemplate.opsForValue()
                         .get("user:" + userId + ":fav_category");
@@ -30,12 +32,14 @@ public class RecommendationService {
         Page<ProductDoc> productDocPage;
 
         if (favoriteCategory != null) {
-            productDocPage =
-                    productRepository.findByCategory(favoriteCategory, pageable);
+            log.info("Personalization: USer {} has favorite category '{}'. Fetching targeted results.", userId,favoriteCategory);
+            productDocPage = productRepository.findByCategory(favoriteCategory, pageable);
         } else {
-            productDocPage =
-                    productRepository.findAll(pageable);
+            log.info("Personalization: No favorite category found for User {}. Fetching default results.",userId);
+            productDocPage = productRepository.findAll(pageable);
         }
+
+        log.debug("Returned {} products for User {}", productDocPage.getNumberOfElements(),userId);
 
         return new RecommendationResponse(
                 productDocPage.getContent(),

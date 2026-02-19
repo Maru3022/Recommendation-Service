@@ -11,6 +11,6 @@ public class EventConsumer {
 
     @KafkaListener(topics = "user-actions", groupId = "rec-group")
     public void consumeUserAction(UserAction action){
-        log.info("Received action: {] from user: {}", action.getActionType(),action.getUserId());
+        log.info("Received action: {] from user: {}, ProductId: {}", action.getActionType(),action.getUserId(), action.getProductId());
     }
 }
