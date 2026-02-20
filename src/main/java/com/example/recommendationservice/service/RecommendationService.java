@@ -6,6 +6,8 @@ import com.example.recommendationservice.repository.ProductSearchRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -21,8 +23,9 @@ public class RecommendationService {
     private final ProductSearchRepository productRepository;
     private final RedisTemplate<String, Object> redisTemplate;
 
+    @Cacheable(value = "recommendations", key = "#userId + #page", unless = "#result == null")
     public RecommendationResponse getRecommendations(String userId, int page, int size) {
-        log.debug("Fetching recommendation for UserID: {} (Page: {}, Size: {})",userId,page,size);
+        log.debug("Fetching recommendation for UserID: {} (Page: {}, Size: {})", userId, page, size);
         String favoriteCategory =
                 (String) redisTemplate.opsForValue()
                         .get("user:" + userId + ":fav_category");
@@ -32,14 +35,14 @@ public class RecommendationService {
         Page<ProductDoc> productDocPage;
 
         if (favoriteCategory != null) {
-            log.info("Personalization: USer {} has favorite category '{}'. Fetching targeted results.", userId,favoriteCategory);
+            log.info("Personalization: USer {} has favorite category '{}'. Fetching targeted results.", userId, favoriteCategory);
             productDocPage = productRepository.findByCategory(favoriteCategory, pageable);
         } else {
-            log.info("Personalization: No favorite category found for User {}. Fetching default results.",userId);
+            log.info("Personalization: No favorite category found for User {}. Fetching default results.", userId);
             productDocPage = productRepository.findAll(pageable);
         }
 
-        log.debug("Returned {} products for User {}", productDocPage.getNumberOfElements(),userId);
+        log.debug("Returned {} products for User {}", productDocPage.getNumberOfElements(), userId);
 
         return new RecommendationResponse(
                 productDocPage.getContent(),

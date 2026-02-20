@@ -23,4 +23,29 @@ public class GlobalExceptionHandler {
 
         return new ResponseEntity<>(error,HttpStatus.INTERNAL_SERVER_ERROR);
     }
+
+    @ExceptionHandler(org.springframework.data.redis.RedisConnectionFailureException.class)
+    public ResponseEntity<ErrorResponse> handleRedisException(Exception ex){
+        log.error("WARN: Redis connection failed. Personalization might be disabled. Error: {}", ex.getMessage());
+
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.SERVICE_UNAVAILABLE.value(),
+                "Personalization data source error",
+                System.currentTimeMillis()
+        );
+
+        return new ResponseEntity<>(error, HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleGenericException(Exception ex){
+        log.error("UNEXPECTED ERROR occurred: ", ex);
+
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "An internal server error occurred",
+                System.currentTimeMillis()
+        );
+        return new ResponseEntity<>(error,HttpStatus.INTERNAL_SERVER_ERROR);
+    }
 }

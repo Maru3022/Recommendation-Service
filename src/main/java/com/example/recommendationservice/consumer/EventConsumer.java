@@ -9,8 +9,12 @@ import org.springframework.stereotype.Service;
 @Service
 public class EventConsumer {
 
-    @KafkaListener(topics = "user-actions", groupId = "rec-group")
+    @KafkaListener(
+            topics = "user-actions",
+            groupId = "rec-group",
+            concurrency = "3"
+    )
     public void consumeUserAction(UserAction action){
-        log.info("Received action: {] from user: {}, ProductId: {}", action.getActionType(),action.getUserId(), action.getProductId());
+        log.info("Processing action: {} for user: {}", action.getActionType(), action.getUserId());
     }
 }

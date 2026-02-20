@@ -3,111 +3,216 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Recommendation Feed</title>
+    <title>Personalized Feed</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary: #6366f1;
+            --success: #10b981;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+        }
+
         * { box-sizing: border-box; }
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
+            background-color: var(--bg);
             margin: 0;
             padding: 20px;
-            color: #111827;
+            color: var(--text-main);
         }
 
         .header {
             max-width: 1200px;
-            margin: 0 auto 30px;
+            margin: 0 auto 40px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
         }
 
-        .search-area {
-            display: flex;
-            gap: 8px;
-        }
+        .logo { font-size: 24px; font-weight: 800; color: var(--primary); }
+
+        .search-area { display: flex; gap: 10px; }
 
         input {
-            padding: 10px 16px;
-            border: 1px solid #d1d5db;
-            border-radius: 20px;
+            padding: 12px 20px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
             outline: none;
-            width: 250px;
+            width: 300px;
+            transition: border-color 0.3s;
         }
+
+        input:focus { border-color: var(--primary); }
 
         button {
-            background: #000;
+            background: var(--primary);
             color: #fff;
             border: none;
-            padding: 10px 20px;
-            border-radius: 20px;
+            padding: 12px 24px;
+            border-radius: 12px;
             cursor: pointer;
-            font-weight: 600;
-            transition: transform 0.1s;
+            font-weight: 700;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.4);
         }
 
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
         button:active { transform: scale(0.95); }
 
-        /* Сетка ленты */
         .feed {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 24px;
+            gap: 30px;
             max-width: 1200px;
             margin: 0 auto;
         }
 
-        /* Карточка товара в ленте */
         .feed-item {
-            background: #fff;
-            border-radius: 16px;
+            background: var(--card-bg);
+            border-radius: 20px;
             overflow: hidden;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease;
-            animation: fadeIn 0.5s ease forwards;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid #f1f5f9;
         }
 
         .feed-item:hover {
-            transform: translateY(-5px);
+            transform: translateY(-10px);
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
         }
 
-        .image-placeholder {
+        .image-container {
             width: 100%;
-            height: 200px;
-            background: #e5e7eb;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 40px;
+            height: 220px;
+            background: #f1f5f9;
+            position: relative;
+            overflow: hidden;
         }
 
-        .content {
-            padding: 16px;
+        .image-container img {
+            width: 100%; height: 100%; object-fit: cover;
         }
+
+        .content { padding: 20px; }
 
         .tag {
             display: inline-block;
-            background: #eff6ff;
-            color: #3b82f6;
-            font-size: 12px;
+            background: #eef2ff;
+            color: var(--primary);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
             font-weight: 700;
-            padding: 4px 10px;
-            border-radius: 12px;
-            margin-bottom: 8px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
         }
 
         .title {
-            font-size: 18px;
-            font-weight: 600;
-            margin: 0 0 8px 0;
+            font-size: 19px;
+            font-weight: 700;
+            margin: 0 0 10px 0;
+            line-height: 1.4;
         }
 
         .price-tag {
-            font-size: 20px;
-            font-weight: 700;
-            color: #059669;
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--success);
         }
 
-        @keyframes fadeIn {
-            from { opacity
+        /* Состояния загрузки и ошибок */
+        .status-msg {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 50px;
+            font-size: 18px;
+            color: #64748b;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+<header class="header">
+    <div class="logo">REC.SYSTEM</div>
+    <div class="search-area">
+        <input type="text" id="userIdInput" placeholder="Введите ID пользователя (напр. 123)">
+        <button onclick="loadRecommendations()">Получить рекомендации</button>
+    </div>
+</header>
+
+<main class="feed" id="mainFeed">
+    <div class="status-msg">Введите ID пользователя, чтобы увидеть персональную ленту</div>
+</main>
+
+<script>
+    const API_URL = 'http://localhost:8080/api/recommendations'; // Проверь порт своего Spring Boot
+
+    async function loadRecommendations() {
+        const userId = document.getElementById('userIdInput').value;
+        const feedContainer = document.getElementById('mainFeed');
+
+        if (!userId) {
+            alert("Пожалуйста, введите ID пользователя");
+            return;
+        }
+
+        // Показываем состояние загрузки
+        feedContainer.innerHTML = '<div class="status-msg" style="animation: pulse 1.5s infinite">Загружаем ваши рекомендации...</div>';
+
+        try {
+            const response = await fetch(`${API_URL}/${userId}`);
+
+            if (!response.ok) {
+                // Если сработал наш GlobalExceptionHandler
+                const errorData = await response.json();
+                throw new Error(errorData.message || "Ошибка сервера");
+            }
+
+            const data = await response.json(); // Ожидаем RecommendationResponse
+            renderFeed(data.products);
+
+        } catch (error) {
+            console.error("Fetch error:", error);
+            feedContainer.innerHTML = `
+                    <div class="status-msg" style="color: #ef4444">
+                        <b>Ошибка:</b> ${error.message}<br>
+                        <small>Убедитесь, что бэкенд запущен и CORS настроен</small>
+                    </div>`;
+        }
+    }
+
+    function renderFeed(products) {
+        const feedContainer = document.getElementById('mainFeed');
+
+        if (!products || products.length === 0) {
+            feedContainer.innerHTML = '<div class="status-msg">Для данного пользователя пока нет рекомендаций</div>';
+            return;
+        }
+
+        feedContainer.innerHTML = products.map(product => `
+                <div class="feed-item">
+                    <div class="image-container">
+                        <img src="${product.imageUrl || 'https://via.placeholder.com/300x200?text=No+Image'}" alt="${product.name}">
+                    </div>
+                    <div class="content">
+                        <span class="tag">${product.category}</span>
+                        <h3 class="title">${product.name}</h3>
+                        <div class="price-tag">$${product.price.toFixed(2)}</div>
+                    </div>
+                </div>
+            `).join('');
+    }
+</script>
+</body>
+</html>
