@@ -41,3 +41,24 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+  recommendation-service:
+    build: .
+    ports:
+      - "8026:8026"
+    depends_on:
+      - elasticsearch
+      - redis
+      - kafka
+      - postgres
+
+  k6:
+    image: grafana/k6:latest
+    volumes:
+      - ./k6:/scripts
+    environment:
+      - BASE_URL=http://recommendation-service:8026
+    # На скрине твой файл в папке k6 называется load-test.js
+    entrypoint: ["k6", "run", "/scripts/load-test.js"]
+    depends_on:
+      - recommendation-service

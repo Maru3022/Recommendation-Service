@@ -5,7 +5,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,8 +17,22 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build with Maven
+      - name: Build Application Jar
         run: mvn clean package -DskipTests
 
-      - name: Build Docker Image
-        run: docker build -t recommendation-service .
+      - name: Run Infrastructure and Tests
+        run: |
+          # Запускаем все сервисы в фоне
+          docker-compose up -d --build recommendation-service
+          
+          # Даем время сервисам и Java подняться (30-40 сек обычно хватает)
+          echo "Waiting for services to start..."
+          sleep 40
+          
+          # Запускаем k6 через docker-compose
+          docker-compose run --name k6-test k6
+
+      - name: Check k6 Results
+        run: |
+          # Если k6 упадет или будут ошибки в тестах, этот шаг завалит пайплайн
+          docker inspect k6-test --format='{{.State.ExitCode}}' | grep ^0$

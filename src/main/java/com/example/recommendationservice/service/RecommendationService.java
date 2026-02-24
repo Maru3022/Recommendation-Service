@@ -20,7 +20,7 @@ import org.springframework.stereotype.Service;
 public class RecommendationService {
 
     @Autowired
-    private final ProductSearchRepository productRepository;
+    private ProductSearchRepository productRepository;
     private final RedisTemplate<String, Object> redisTemplate;
 
     @Cacheable(value = "recommendations", key = "#userId + #page", unless = "#result == null")
