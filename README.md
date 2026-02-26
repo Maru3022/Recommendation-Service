@@ -1,100 +1,100 @@
 ## Recommendation Service
 
-Recommendation Service is a high‑performance Spring Boot microservice that returns personalized product recommendations, backed by PostgreSQL, Elasticsearch, Redis, Kafka and k6 load tests.  
-The project is fully containerized with Docker Compose and has a ready‑to‑use CI/CD pipeline on GitHub Actions.
+Recommendation Service — это высокопроизводительный микросервис на Spring Boot, который отдаёт персональные рекомендации товаров.  
+Он использует PostgreSQL, Elasticsearch, Redis, Kafka и нагрузочное тестирование через k6, полностью упакован в Docker Compose и имеет готовый CI/CD на GitHub Actions.
 
 ---
 
-### Features
+### Возможности
 
-- **REST API for recommendations**  
+- **REST API для рекомендаций**  
   - `GET /api/recommendations/{userId}?page={page}&size={size}`  
-  - Returns a `RecommendationResponse` with:
-    - list of products
-    - current page
-    - total elements
-    - flag `hasNext`
+  - Возвращает объект `RecommendationResponse` с:
+    - списком товаров;
+    - текущей страницей;
+    - общим количеством элементов;
+    - флагом `hasNext` (есть ли следующая страница).
 
-- **Personalization via Redis**  
-  - Reads favorite category from Redis key `user:{userId}:fav_category`.  
-  - If category is present → queries only products of this category in Elasticsearch.  
-  - If category is missing → falls back to “all products” search.
+- **Персонализация через Redis**  
+  - Любимая категория пользователя читается из ключа `user:{userId}:fav_category` в Redis.  
+  - Если категория есть → поиск только по этой категории в Elasticsearch.  
+  - Если категории нет → дефолтный поиск по всем товарам.
 
-- **Search & storage in Elasticsearch**  
-  - `ProductSearchRepository` for product search.  
-  - `ActionRepository` for tracking user actions (clicks, views, etc.).  
-  - Indices are created automatically via Spring Data Elasticsearch.
+- **Поиск и хранение в Elasticsearch**  
+  - `ProductSearchRepository` — поиск товаров.  
+  - `ActionRepository` — хранение пользовательских действий (просмотры, клики и т.п.).  
+  - Индексы создаются автоматически через Spring Data Elasticsearch.
 
-- **Product sync from Kafka**  
-  - `ProductSyncConsumer` listens to topic `product-updates` (group `rec-group`).  
-  - Every incoming `ProductDoc` is saved via `ProductSyncService` into Elasticsearch.
+- **Синхронизация товаров из Kafka**  
+  - `ProductSyncConsumer` слушает топик `product-updates` (группа `rec-group`).  
+  - Каждый полученный `ProductDoc` сохраняется в Elasticsearch через `ProductSyncService`.
 
-- **Resilience & error handling**  
+- **Обработка ошибок и устойчивость**  
   - `GlobalExceptionHandler`:
-    - Elasticsearch “index not found” → HTTP `500`.
-    - Redis connection issues → HTTP `503` with message _"Personalization data source error"_.  
-    - Generic errors → HTTP `500` with a safe generic message.
+    - проблемы с Elasticsearch (нет индекса) → HTTP `500`;  
+    - падение Redis → HTTP `503` и сообщение _"Personalization data source error"_;  
+    - любые неожиданные ошибки → HTTP `500` с безопасным текстом.
 
-- **Load testing with k6**  
-  - `k6/load-test.js` aggressively hits `GET /api/recommendations/user_{id}` with stages:
-    - `30s` → `50` VUs  
-    - `1m` → `100` VUs  
-    - `30s` ramp‑down  
-  - Automatically runs inside Docker as the `k6` service.
+- **Нагрузочное тестирование через k6**  
+  - Скрипт `k6/load-test.js` шлёт запросы на `GET /api/recommendations/user_{id}` со стадиями нагрузки:
+    - `30s` → `50` виртуальных пользователей;  
+    - `1m` → `100` пользователей;  
+    - `30s` — плавное снижение нагрузки.  
+  - В Docker запускается отдельный сервис `k6`, который автоматически выполняет сценарий.
 
-- **CI/CD ready**  
-  - GitHub Actions pipeline:
-    - builds the JAR;
-    - runs `mvn test` with H2 in‑memory DB for tests;
-    - starts full Docker stack and executes k6 scenario.
-
----
-
-### Tech Stack
-
-- **Backend**: Java 17, Spring Boot 3 (Web, Data JPA, Data Redis, Data Elasticsearch, Spring Kafka)  
-- **Datastores**: PostgreSQL, Elasticsearch, Redis  
-- **Messaging**: Kafka + Zookeeper  
-- **Load testing**: k6  
-- **Infrastructure**: Docker, Docker Compose, GitHub Actions
+- **Готовый CI/CD**  
+  - GitHub Actions:
+    - собирает JAR;
+    - запускает `mvn test` с H2 (in‑memory) для тестов;
+    - поднимает весь Docker‑стек и прогоняет сценарий k6.
 
 ---
 
-## Quick Start
+### Технологии
 
-### 1. Run everything with Docker (recommended)
+- **Backend**: Java 17, Spring Boot 3 (`spring-boot-starter-web`, Data JPA, Data Redis, Data Elasticsearch, Spring Kafka)  
+- **Хранилища**: PostgreSQL, Elasticsearch, Redis  
+- **Сообщения**: Kafka + Zookeeper  
+- **Нагрузочное тестирование**: k6  
+- **Инфраструктура**: Docker, Docker Compose, GitHub Actions
 
-Requirements:
-- Docker
-- Docker Compose v2 (`docker compose` command)
+---
 
-From the project root:
+## Быстрый старт
+
+### 1. Запуск всего проекта через Docker (рекомендуется)
+
+**Требования**:
+- установлен Docker;
+- Docker Compose v2 (команда `docker compose`).
+
+Из корня проекта выполните:
 
 ```bash
 docker compose up -d --build
 ```
 
-This will start:
-- `postgres` – main relational DB (`recommendation_db`)  
-- `elasticsearch` – search engine  
-- `redis` – personalization cache  
-- `zookeeper` + `kafka` – message broker for product updates  
-- `recommendation-service` – Spring Boot application on port `8026`  
-- `k6` – container that automatically runs the load‑test script `k6/load-test.js`
+Будут запущены контейнеры:
+- **`postgres`** — основная БД (`recommendation_db`);  
+- **`elasticsearch`** — поисковый движок;  
+- **`redis`** — кеш/хранилище данных для персонализации;  
+- **`zookeeper` + `kafka`** — брокер сообщений для обновлений товаров;  
+- **`recommendation-service`** — Spring Boot сервис на порту `8026`;  
+- **`k6`** — контейнер, автоматически запускающий `k6/load-test.js`.
 
-Check that the API is up:
+Проверить работу API:
 
 ```bash
 curl "http://localhost:8026/api/recommendations/user_1?page=0&size=10"
 ```
 
-To view k6 logs:
+Посмотреть логи k6:
 
 ```bash
 docker compose logs k6 --tail=100
 ```
 
-To stop everything:
+Остановить все сервисы:
 
 ```bash
 docker compose down
@@ -102,73 +102,74 @@ docker compose down
 
 ---
 
-### 2. Run locally without Docker (for development)
+### 2. Локальный запуск без Docker (для разработки)
 
-Requirements:
-- JDK 17+
-- Maven
-- Running instances of PostgreSQL, Elasticsearch, Redis, Kafka (or adjust `application.properties`)
+**Требования**:
+- JDK 17+;
+- Maven;
+- запущенные PostgreSQL, Elasticsearch, Redis и Kafka  
+  (либо адаптировать `src/main/resources/application.properties` под своё окружение).
 
-Steps:
+Шаги:
 
 ```bash
 mvn clean package
 mvn spring-boot:run
 ```
 
-The service will be available at:
+Сервис будет доступен по адресу:
 
 ```text
 http://localhost:8026
 ```
 
-Main endpoint:
+Основной эндпоинт:
 
 ```text
 GET /api/recommendations/{userId}?page=0&size=10
 ```
 
-Example:
+Пример запроса:
 
 ```bash
-curl "http://localhost:8026/api/recommendations/user_123?page=0&size=10"
+curl "http://localhost:8026/api/recommendations/some_user?page=0&size=10"
 ```
 
 ---
 
-### 3. Running tests
+### 3. Запуск тестов
 
-- **Unit & integration tests** (with in‑memory H2 DB):
+- **Юнит‑ и интеграционные тесты** (in‑memory H2):
 
 ```bash
 mvn test
 ```
 
-The test profile:
-- uses H2 instead of PostgreSQL;  
-- mocks Elasticsearch repositories and disables Kafka listeners;  
-- keeps tests fast and independent from external services.
+Тестовый профиль:
+- использует H2 вместо PostgreSQL;  
+- мокает Elasticsearch‑репозитории и отключает Kafka‑листенеры;  
+- позволяет гонять тесты без внешних сервисов.
 
 ---
 
 ## CI/CD (GitHub Actions)
 
-The workflow is defined in `.github/workflows/main.yml` and does:
+Workflow описан в `.github/workflows/main.yml` и делает следующее:
 
-1. **Checkout & JDK**  
-   - `actions/checkout@v4`  
-   - `actions/setup-java@v4` with Java 17
+1. **Checkout и настройка JDK**  
+   - `actions/checkout@v4`;  
+   - `actions/setup-java@v4` c Java 17.
 
-2. **Build**  
-   - `mvn clean package -DskipTests`
+2. **Сборка приложения**  
+   - `mvn clean package -DskipTests`.
 
-3. **Infrastructure & tests**  
-   - `docker compose up -d --build` to start the whole stack.  
-   - Wait for containers to boot.  
-   - Run k6 scenario inside the `k6` container.
+3. **Инфраструктура и нагрузочные тесты**  
+   - `docker compose up -d --build` — поднимает весь стек;  
+   - делает паузу, чтобы сервисы успели стартовать;  
+   - запускает сценарий k6 внутри контейнера `k6`.
 
-4. **Result check**  
-   - Inspect k6 container exit code; if it is non‑zero, the pipeline fails.
+4. **Проверка результата**  
+   - инспектирует код выхода контейнера `k6`;  
+   - если код не `0` — pipeline помечается как неуспешный.
 
-This makes the repository immediately usable as a demo of a production‑like recommendation service with full infra and tests.
-
+Благодаря этому репозиторий можно использовать как готовый пример production‑подобного recommendation‑сервиса с полной инфраструктурой и CI/CD.
