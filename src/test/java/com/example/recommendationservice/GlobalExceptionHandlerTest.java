@@ -17,7 +17,8 @@ public class GlobalExceptionHandlerTest {
     void handleRedisException_ShouldReturn503(){
         RedisConnectionFailureException ex = new RedisConnectionFailureException("Conn failed");
 
-        ResponseEntity<ErrorResponse> response = handler.handleElasticsearchException(ex);
+
+        ResponseEntity<ErrorResponse> response = handler.handleRedisException(ex);
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());
         assertEquals("Personalization data source error", response.getBody().getMessage());
     }

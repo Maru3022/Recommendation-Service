@@ -11,7 +11,7 @@ export const options = {
 
 export default function () {
     // ВАЖНО: имя хоста должно совпадать с именем сервиса в compose.yaml
-    const baseUrl = 'http://app:8026';
+    const baseUrl = 'http://recommendation-service:8026';
     const userId = Math.floor(Math.random() * 1000);
 
     const res = http.get(`${baseUrl}/api/recommendations/user_${userId}`);
