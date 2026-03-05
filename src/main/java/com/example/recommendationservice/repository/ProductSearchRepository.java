@@ -5,8 +5,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.elasticsearch.repository.ElasticsearchRepository;
 
+import java.util.List;
+
 public interface ProductSearchRepository
         extends ElasticsearchRepository<ProductDoc, String> {
 
     Page<ProductDoc> findByCategory(String category, Pageable pageable);
+    List<ProductDoc> findAllByIdIn(List<String> ids);
 }

@@ -2,17 +2,25 @@ package com.example.recommendationservice.service;
 
 import com.example.recommendationservice.model.ProductDoc;
 import com.example.recommendationservice.model.RecommendationResponse;
+import com.example.recommendationservice.model.UserAction;
 import com.example.recommendationservice.repository.ProductSearchRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.elasticsearch.client.elc.ElasticsearchAggregations;
+import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.data.elasticsearch.client.elc.NativeQuery;
+
+import co.elastic.clients.elasticsearch._types.aggregations.Aggregation;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -20,6 +28,7 @@ import org.springframework.stereotype.Service;
 public class RecommendationService {
 
     private final ProductSearchRepository productRepository;
+    private final ElasticsearchOperations elasticsearchOperations;
     private final RedisTemplate<String, Object> redisTemplate;
 
     @Cacheable(value = "recommendations", key = "#userId + #page", unless = "#result == null")
@@ -49,5 +58,35 @@ public class RecommendationService {
                 productDocPage.getTotalElements(),
                 productDocPage.hasNext()
         );
+    }
+
+    public List<ProductDoc> getPopularProducts(int limit){
+        NativeQuery query = NativeQuery.builder()
+                .withMaxResults(0)
+                .withAggregation("most_popular", Aggregation.of(a -> a
+                        .terms(t -> t
+                                .field("productId")
+                                .size(limit)
+                        )
+                ))
+                .build();
+
+        SearchHits<UserAction> hits = elasticsearchOperations.search(query,UserAction.class);
+
+        if(hits.getAggregations() == null) return new ArrayList<>();
+
+        ElasticsearchAggregations aggregations = (ElasticsearchAggregations) hits.getAggregations();
+        List<String> popularIds = new ArrayList<>();
+        var aggregate = aggregations.get("most_popular").aggregation().getAggregate();
+
+        if(aggregate.isSterms()){
+            aggregate.sterms().buckets().array().forEach(bucket -> {
+                popularIds.add(bucket.key().stringValue());
+            });
+        }
+
+        if(popularIds.isEmpty()) return new ArrayList<>();
+
+        return productRepository.findAllByIdIn(popularIds);
     }
 }

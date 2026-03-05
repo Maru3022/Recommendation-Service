@@ -1,11 +1,15 @@
 package com.example.recommendationservice.controller;
 
+import com.example.recommendationservice.model.ProductDoc;
 import com.example.recommendationservice.model.RecommendationResponse;
 import com.example.recommendationservice.service.RecommendationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Repository;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @Slf4j
@@ -32,5 +36,10 @@ public class RecommendationController {
         log.info("Sent recommendations to UserID: {} | Count: {} | Duration: {}ms", userId,response.getProducts().size(),duration);
 
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/popular")
+    public ResponseEntity<List<ProductDoc>> getPopular(@RequestParam(defaultValue = "10") int limit){
+        return ResponseEntity.ok(recommendationService.getPopularProducts(limit));
     }
 }
