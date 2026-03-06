@@ -1,5 +1,4 @@
 services:
-  # Elasticsearch: основной сервис для поиска продуктов
   elasticsearch:
     image: 'docker.elastic.co/elasticsearch/elasticsearch:8.12.0'
     container_name: elasticsearch
@@ -14,7 +13,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # База данных Postgres
   postgres:
     image: 'postgres:latest'
     container_name: postgres
@@ -22,7 +20,6 @@ services:
       - 'POSTGRES_DB=recommendation_db'
       - 'POSTGRES_PASSWORD=secret'
       - 'POSTGRES_USER=user'
-    # Добавляем команду для увеличения лимита подключений до 200
     command: [ "postgres", "-c", "max_connections=200" ]
     ports:
       - '5433:5432'
@@ -32,7 +29,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Кэш Redis
   redis:
     image: 'redis:latest'
     container_name: redis
@@ -44,7 +40,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Инфраструктура Kafka
   zookeeper:
     image: 'confluentinc/cp-zookeeper:7.5.0'
     environment:
@@ -65,7 +60,6 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9098
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
-  # Ваше Java-приложение
   recommendation-service:
     build: .
     container_name: recommendation-service
@@ -74,8 +68,23 @@ services:
     depends_on:
       elasticsearch:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
-      # Внутри Docker переопределяем URL, чтобы приложение шло по имени сервиса
       - ELASTICSEARCH_URL=http://elasticsearch:9200
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/recommendation_db
       - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+
+  # ДОБАВЛЕННЫЙ БЛОК ДЛЯ ТЕСТОВ
+  k6:
+    image: grafana/k6
+    container_name: k6
+    volumes:
+      - ./k6:/scripts
+    # Заменяем script.js на реальное имя твоего файла, если оно другое
+    command: run /scripts/script.js
+    depends_on:
+      - recommendation-service
