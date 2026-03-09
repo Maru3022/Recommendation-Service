@@ -84,6 +84,6 @@ services:
     container_name: k6
     volumes:
       - ./k6:/scripts
-    command: run /scripts/script.js
+    command: run /scripts/load-test.js
     depends_on:
       - recommendation-service
