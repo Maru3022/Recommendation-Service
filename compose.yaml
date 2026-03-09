@@ -84,7 +84,6 @@ services:
     container_name: k6
     volumes:
       - ./k6:/scripts
-    # Заменяем script.js на реальное имя твоего файла, если оно другое
     command: run /scripts/script.js
     depends_on:
       - recommendation-service
