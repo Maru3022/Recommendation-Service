@@ -25,12 +25,12 @@ jobs:
 
       - name: Run Infrastructure and Tests
         run: |
-          # Запуск всех сервисов (Elastic, Postgres, Redis, Kafka + App)
+          # Запуск сервисов с пересборкой
           docker compose up -d --build
           
-          echo "Waiting for Recommendation-Service on port 8026..."
-          # Проверяем именно 8026 порт, так как он указан в твоих настройках
-          timeout 120s bash -c 'until curl -s localhost:8026 > /dev/null; do sleep 5; done' || (echo "App failed to start" && docker compose logs && exit 1)
+          echo "Waiting for Recommendation-Service on port 8099..."
+          # ТЕПЕРЬ ПРОВЕРЯЕМ ПОРТ 8099 (внешний из вашего нового compose)
+          timeout 120s bash -c 'until curl -s localhost:8099/actuator/health > /dev/null; do sleep 5; done' || (echo "App failed to start" && docker compose logs && exit 1)
           
           echo "Running k6 load tests..."
           docker compose run --name k6-test k6

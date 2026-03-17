@@ -6,7 +6,7 @@ services:
       - 'discovery.type=single-node'
       - 'xpack.security.enabled=false'
     ports:
-      - '9226:9200'
+      - '9444:9200' # Уникальный порт для ES
     healthcheck:
       test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -vq '\"status\":\"red\"'"]
       interval: 10s
@@ -22,7 +22,7 @@ services:
       - 'POSTGRES_USER=user'
     command: [ "postgres", "-c", "max_connections=200" ]
     ports:
-      - '5433:5432'
+      - '5499:5432' # Уникальный порт для Postgres
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U user -d recommendation_db" ]
       interval: 10s
@@ -33,7 +33,7 @@ services:
     image: 'redis:latest'
     container_name: redis
     ports:
-      - '6380:6379'
+      - '6399:6379' # Уникальный порт для Redis
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -52,19 +52,19 @@ services:
     depends_on:
       - zookeeper
     ports:
-      - '9098:9098'
+      - '9099:9098' # Уникальный внешний порт для Kafka
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9098
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9099
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
   recommendation-service:
     build: .
     container_name: recommendation-service
     ports:
-      - "8026:8026"
+      - "8099:8026" # Уникальный внешний порт для Сервиса
     depends_on:
       elasticsearch:
         condition: service_healthy
@@ -78,7 +78,6 @@ services:
       - SPRING_DATA_REDIS_HOST=redis
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
 
-  # ДОБАВЛЕННЫЙ БЛОК ДЛЯ ТЕСТОВ
   k6:
     image: grafana/k6
     container_name: k6
