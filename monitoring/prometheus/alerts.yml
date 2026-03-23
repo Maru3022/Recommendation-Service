@@ -1,0 +1,29 @@
+groups:
+  - name: recommendation-service-alerts
+    rules:
+      - alert: RecommendationServiceDown
+        expr: up{job="recommendation-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Recommendation service is down"
+          description: "Prometheus cannot scrape recommendation-service for more than 1 minute."
+
+      - alert: HighJvmMemoryUsage
+        expr: (jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"}) > 0.85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High JVM heap usage"
+          description: "JVM heap memory usage is above 85% for at least 2 minutes."
+
+      - alert: HighHttp5xxRate
+        expr: sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) > 0.2
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Elevated 5xx error rate"
+          description: "Service is returning 5xx responses at a sustained rate."

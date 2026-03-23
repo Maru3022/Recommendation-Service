@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: "Recommendation Monitoring"
+    orgId: 1
+    folder: "Recommendation"
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

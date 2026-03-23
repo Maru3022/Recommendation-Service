@@ -81,7 +81,10 @@ docker compose up -d --build
 - **`zookeeper` + `kafka`** — брокер сообщений для обновлений товаров;  
 - **`recommendation-service`** — Spring Boot сервис на порту `8026`;  
 - **`prometheus`** — сбор метрик с `recommendation-service`;  
-- **`grafana`** — визуализация метрик (логин: `admin`, пароль: `admin`).
+- **`grafana`** — визуализация метрик/логов (логин: `admin`, пароль: `admin`);
+- **`loki` + `promtail`** — централизованный сбор и поиск логов;
+- **`alertmanager`** — обработка alert-правил Prometheus;
+- **`node-exporter` + `cadvisor`** — метрики хоста и контейнеров.
 
 Проверить работу API:
 
@@ -107,6 +110,8 @@ docker compose --profile loadtest run --rm k6
 Prometheus: http://localhost:9090
 Grafana:    http://localhost:3000
 Metrics:    http://localhost:8099/actuator/prometheus
+Loki:       http://localhost:3100
+Alerts:     http://localhost:9093
 ```
 
 Остановить все сервисы:
