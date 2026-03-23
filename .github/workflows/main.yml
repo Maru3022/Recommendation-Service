@@ -25,15 +25,22 @@ jobs:
 
       - name: Run Infrastructure and Tests
         run: |
-          # Запуск сервисов с пересборкой
           docker compose up -d --build
-          
+
           echo "Waiting for Recommendation-Service on port 8099..."
-          # ТЕПЕРЬ ПРОВЕРЯЕМ ПОРТ 8099 (внешний из вашего нового compose)
           timeout 120s bash -c 'until curl -s localhost:8099/actuator/health > /dev/null; do sleep 5; done' || (echo "App failed to start" && docker compose logs && exit 1)
-          
+
+          echo "Validating Prometheus endpoint..."
+          timeout 60s bash -c 'until curl -s localhost:8099/actuator/prometheus | grep -q "jvm_threads_live_threads"; do sleep 5; done' || (echo "Prometheus metrics are not available" && docker compose logs recommendation-service && exit 1)
+
+          echo "Waiting for Prometheus API..."
+          timeout 90s bash -c 'until curl -s localhost:9090/-/ready > /dev/null; do sleep 5; done' || (echo "Prometheus failed to start" && docker compose logs prometheus && exit 1)
+
+          echo "Checking Grafana login page..."
+          timeout 90s bash -c 'until curl -s -o /dev/null -w "%{http_code}" localhost:3000/login | grep -q "200"; do sleep 5; done' || (echo "Grafana failed to start" && docker compose logs grafana && exit 1)
+
           echo "Running k6 load tests..."
-          docker compose run --name k6-test k6
+          docker compose --profile loadtest run --rm k6
 
       - name: Check App Logs for Errors
         if: always()
@@ -41,14 +48,6 @@ jobs:
           echo "=== Checking logs for Critical Exceptions ==="
           docker compose logs recommendation-service | grep -iE "Exception|Error" || echo "No critical errors found."
 
-      - name: Validate k6 Results
-        run: |
-          EXIT_CODE=$(docker inspect k6-test --format='{{.State.ExitCode}}')
-          if [ "$EXIT_CODE" -ne 0 ]; then
-            echo "k6 tests failed!"
-            exit 1
-          fi
-
       - name: Shutdown Infrastructure
         if: always()
-        run: docker compose down
+        run: docker compose down -v --remove-orphans

@@ -80,7 +80,8 @@ docker compose up -d --build
 - **`redis`** — кеш/хранилище данных для персонализации;  
 - **`zookeeper` + `kafka`** — брокер сообщений для обновлений товаров;  
 - **`recommendation-service`** — Spring Boot сервис на порту `8026`;  
-- **`k6`** — контейнер, автоматически запускающий `k6/load-test.js`.
+- **`prometheus`** — сбор метрик с `recommendation-service`;  
+- **`grafana`** — визуализация метрик (логин: `admin`, пароль: `admin`).
 
 Проверить работу API:
 
@@ -92,6 +93,20 @@ curl "http://localhost:8026/api/recommendations/user_1?page=0&size=10"
 
 ```bash
 docker compose logs k6 --tail=100
+```
+
+Запустить нагрузочный тест k6 вручную:
+
+```bash
+docker compose --profile loadtest run --rm k6
+```
+
+Проверить мониторинг:
+
+```text
+Prometheus: http://localhost:9090
+Grafana:    http://localhost:3000
+Metrics:    http://localhost:8099/actuator/prometheus
 ```
 
 Остановить все сервисы:

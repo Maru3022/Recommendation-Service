@@ -3,216 +3,417 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Personalized Feed</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <title>Recommendation Service UI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #6366f1;
-            --success: #10b981;
-            --bg: #f8fafc;
-            --card-bg: #ffffff;
-            --text-main: #1e293b;
+            --bg: #f6f8fb;
+            --card: #ffffff;
+            --text: #172033;
+            --muted: #5f6b82;
+            --primary: #3558ff;
+            --primary-hover: #2744d4;
+            --accent: #0dbe86;
+            --danger: #d92d20;
+            --border: #e6eaf2;
         }
 
         * { box-sizing: border-box; }
+
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg);
             margin: 0;
-            padding: 20px;
-            color: var(--text-main);
+            font-family: Inter, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
         }
 
-        .header {
-            max-width: 1200px;
-            margin: 0 auto 40px;
+        .container {
+            max-width: 1240px;
+            margin: 0 auto;
+            padding: 24px 20px 40px;
+        }
+
+        .hero {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 12px;
             flex-wrap: wrap;
-            gap: 20px;
+            margin-bottom: 24px;
         }
 
-        .logo { font-size: 24px; font-weight: 800; color: var(--primary); }
-
-        .search-area { display: flex; gap: 10px; }
-
-        input {
-            padding: 12px 20px;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            outline: none;
-            width: 300px;
-            transition: border-color 0.3s;
+        .hero h1 {
+            margin: 0;
+            font-size: 28px;
         }
 
-        input:focus { border-color: var(--primary); }
-
-        button {
-            background: var(--primary);
-            color: #fff;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 12px;
-            cursor: pointer;
-            font-weight: 700;
-            transition: all 0.2s;
-            box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.4);
+        .hero p {
+            margin: 8px 0 0;
+            color: var(--muted);
         }
 
-        button:hover { opacity: 0.9; transform: translateY(-1px); }
-        button:active { transform: scale(0.95); }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 10px 22px rgba(26, 46, 86, 0.06);
+        }
 
-        .feed {
+        .controls {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 30px;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .feed-item {
-            background: var(--card-bg);
-            border-radius: 20px;
-            overflow: hidden;
-            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            border: 1px solid #f1f5f9;
-        }
-
-        .feed-item:hover {
-            transform: translateY(-10px);
-            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
-        }
-
-        .image-container {
-            width: 100%;
-            height: 220px;
-            background: #f1f5f9;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .image-container img {
-            width: 100%; height: 100%; object-fit: cover;
-        }
-
-        .content { padding: 20px; }
-
-        .tag {
-            display: inline-block;
-            background: #eef2ff;
-            color: var(--primary);
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-weight: 700;
-            padding: 6px 12px;
-            border-radius: 8px;
+            grid-template-columns: 1.2fr 0.7fr 0.7fr auto auto;
+            gap: 10px;
+            align-items: end;
             margin-bottom: 12px;
         }
 
-        .title {
-            font-size: 19px;
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        label {
+            font-size: 13px;
+            color: var(--muted);
+            font-weight: 600;
+        }
+
+        input, select {
+            height: 42px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0 12px;
+            font-size: 15px;
+            outline: none;
+        }
+
+        input:focus, select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(53, 88, 255, 0.14);
+        }
+
+        button {
+            height: 42px;
+            border: none;
+            border-radius: 10px;
+            padding: 0 16px;
             font-weight: 700;
-            margin: 0 0 10px 0;
-            line-height: 1.4;
+            cursor: pointer;
         }
 
-        .price-tag {
-            font-size: 22px;
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .btn-primary:hover { background: var(--primary-hover); }
+
+        .btn-secondary {
+            background: #edf1ff;
+            color: #1d2d62;
+        }
+
+        .status {
+            min-height: 24px;
+            color: var(--muted);
+            font-size: 14px;
+            margin: 8px 0 16px;
+        }
+
+        .status.error {
+            color: var(--danger);
+            font-weight: 600;
+        }
+
+        .section-title {
+            margin: 0 0 14px;
+            font-size: 20px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 14px;
+        }
+
+        .product-card {
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+            background: #fff;
+        }
+
+        .product-image {
+            width: 100%;
+            height: 170px;
+            object-fit: cover;
+            display: block;
+            background: #ecf0f9;
+        }
+
+        .product-body {
+            padding: 12px;
+        }
+
+        .chip {
+            display: inline-block;
+            padding: 4px 9px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #1c3d86;
+            background: #e9efff;
+            margin-bottom: 10px;
+        }
+
+        .name {
+            margin: 0 0 8px;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .price {
+            margin: 0;
+            color: var(--accent);
+            font-size: 20px;
             font-weight: 800;
-            color: var(--success);
         }
 
-        /* Состояния загрузки и ошибок */
-        .status-msg {
-            grid-column: 1 / -1;
-            text-align: center;
-            padding: 50px;
-            font-size: 18px;
-            color: #64748b;
+        .pager {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
         }
 
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
+        .pager button:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .popular-wrap {
+            margin-top: 20px;
+        }
+
+        .hint {
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        @media (max-width: 940px) {
+            .controls {
+                grid-template-columns: 1fr 1fr;
+            }
         }
     </style>
 </head>
 <body>
-
-<header class="header">
-    <div class="logo">REC.SYSTEM</div>
-    <div class="search-area">
-        <input type="text" id="userIdInput" placeholder="Введите ID пользователя (напр. 123)">
-        <button onclick="loadRecommendations()">Получить рекомендации</button>
+<div class="container">
+    <div class="hero">
+        <div>
+            <h1>Recommendation Service</h1>
+            <p>Интерфейс для проверки персональных и популярных рекомендаций</p>
+        </div>
     </div>
-</header>
 
-<main class="feed" id="mainFeed">
-    <div class="status-msg">Введите ID пользователя, чтобы увидеть персональную ленту</div>
-</main>
+    <div class="card">
+        <div class="controls">
+            <div class="field">
+                <label for="userId">User ID</label>
+                <input id="userId" type="text" placeholder="например: user_1">
+            </div>
+            <div class="field">
+                <label for="pageSize">Размер страницы</label>
+                <select id="pageSize">
+                    <option value="6">6</option>
+                    <option value="10" selected>10</option>
+                    <option value="20">20</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="popularLimit">Популярные товары</label>
+                <select id="popularLimit">
+                    <option value="5">5</option>
+                    <option value="10" selected>10</option>
+                    <option value="20">20</option>
+                </select>
+            </div>
+            <button class="btn-primary" id="loadBtn">Загрузить рекомендации</button>
+            <button class="btn-secondary" id="popularBtn">Показать популярные</button>
+        </div>
+
+        <div id="status" class="status">Введите `userId` и нажмите "Загрузить рекомендации".</div>
+
+        <h2 class="section-title">Персональные рекомендации</h2>
+        <div id="recommendations" class="grid"></div>
+        <div class="pager">
+            <button class="btn-secondary" id="prevBtn">Назад</button>
+            <span id="pageInfo" class="hint">Страница 1</span>
+            <button class="btn-secondary" id="nextBtn">Вперед</button>
+        </div>
+
+        <div class="popular-wrap">
+            <h2 class="section-title">Популярные товары</h2>
+            <div id="popular" class="grid"></div>
+        </div>
+    </div>
+</div>
 
 <script>
-    const API_URL = 'http://localhost:8080/api/recommendations'; // Проверь порт своего Spring Boot
+    const state = {
+        userId: "",
+        page: 0,
+        size: 10,
+        hasNext: false
+    };
+
+    const statusEl = document.getElementById("status");
+    const recommendationsEl = document.getElementById("recommendations");
+    const popularEl = document.getElementById("popular");
+    const pageInfoEl = document.getElementById("pageInfo");
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const loadBtn = document.getElementById("loadBtn");
+    const popularBtn = document.getElementById("popularBtn");
+
+    loadBtn.addEventListener("click", () => {
+        state.userId = document.getElementById("userId").value.trim();
+        state.size = Number(document.getElementById("pageSize").value);
+        state.page = 0;
+        loadRecommendations();
+    });
+
+    popularBtn.addEventListener("click", loadPopular);
+    prevBtn.addEventListener("click", () => {
+        if (state.page > 0) {
+            state.page -= 1;
+            loadRecommendations();
+        }
+    });
+    nextBtn.addEventListener("click", () => {
+        if (state.hasNext) {
+            state.page += 1;
+            loadRecommendations();
+        }
+    });
+
+    function setStatus(message, isError) {
+        statusEl.textContent = message;
+        statusEl.className = isError ? "status error" : "status";
+    }
+
+    function sanitize(text) {
+        return String(text ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll("\"", "&quot;")
+            .replaceAll("'", "&#039;");
+    }
+
+    function cardTemplate(product) {
+        const name = sanitize(product.name || "Без названия");
+        const category = sanitize(product.category || "unknown");
+        const image = sanitize(product.imageUrl || "https://via.placeholder.com/640x360?text=No+Image");
+        const priceNumber = Number(product.price ?? 0);
+        const price = Number.isFinite(priceNumber) ? priceNumber.toFixed(2) : "0.00";
+
+        return `
+            <article class="product-card">
+                <img class="product-image" src="${image}" alt="${name}">
+                <div class="product-body">
+                    <span class="chip">${category}</span>
+                    <h3 class="name">${name}</h3>
+                    <p class="price">$${price}</p>
+                </div>
+            </article>
+        `;
+    }
+
+    function renderProducts(target, products) {
+        if (!products || products.length === 0) {
+            target.innerHTML = "<p class='hint'>Нет данных для отображения.</p>";
+            return;
+        }
+        target.innerHTML = products.map(cardTemplate).join("");
+    }
+
+    function updatePager() {
+        pageInfoEl.textContent = `Страница ${state.page + 1}`;
+        prevBtn.disabled = state.page === 0;
+        nextBtn.disabled = !state.hasNext;
+    }
+
+    async function parseError(response) {
+        try {
+            const payload = await response.json();
+            return payload.message || payload.error || `HTTP ${response.status}`;
+        } catch (_) {
+            return `HTTP ${response.status}`;
+        }
+    }
 
     async function loadRecommendations() {
-        const userId = document.getElementById('userIdInput').value;
-        const feedContainer = document.getElementById('mainFeed');
-
-        if (!userId) {
-            alert("Пожалуйста, введите ID пользователя");
+        if (!state.userId) {
+            setStatus("Укажите userId, например user_1.", true);
+            recommendationsEl.innerHTML = "";
+            updatePager();
             return;
         }
 
-        // Показываем состояние загрузки
-        feedContainer.innerHTML = '<div class="status-msg" style="animation: pulse 1.5s infinite">Загружаем ваши рекомендации...</div>';
+        setStatus("Загружаем персональные рекомендации...", false);
+        recommendationsEl.innerHTML = "<p class='hint'>Загрузка...</p>";
+
+        const query = new URLSearchParams({
+            page: String(state.page),
+            size: String(state.size)
+        });
 
         try {
-            const response = await fetch(`${API_URL}/${userId}`);
-
+            const response = await fetch(`/api/recommendations/${encodeURIComponent(state.userId)}?${query.toString()}`);
             if (!response.ok) {
-                // Если сработал наш GlobalExceptionHandler
-                const errorData = await response.json();
-                throw new Error(errorData.message || "Ошибка сервера");
+                const message = await parseError(response);
+                throw new Error(message);
             }
 
-            const data = await response.json(); // Ожидаем RecommendationResponse
-            renderFeed(data.products);
-
+            const data = await response.json();
+            state.hasNext = !!data.hasNext;
+            renderProducts(recommendationsEl, data.products);
+            updatePager();
+            setStatus(`Получено ${data.products?.length || 0} товаров. Всего: ${data.totalElements ?? 0}.`, false);
         } catch (error) {
-            console.error("Fetch error:", error);
-            feedContainer.innerHTML = `
-                    <div class="status-msg" style="color: #ef4444">
-                        <b>Ошибка:</b> ${error.message}<br>
-                        <small>Убедитесь, что бэкенд запущен и CORS настроен</small>
-                    </div>`;
+            state.hasNext = false;
+            updatePager();
+            recommendationsEl.innerHTML = "";
+            setStatus(`Ошибка загрузки рекомендаций: ${error.message}`, true);
         }
     }
 
-    function renderFeed(products) {
-        const feedContainer = document.getElementById('mainFeed');
+    async function loadPopular() {
+        const limit = Number(document.getElementById("popularLimit").value);
+        setStatus("Загружаем популярные товары...", false);
+        popularEl.innerHTML = "<p class='hint'>Загрузка...</p>";
 
-        if (!products || products.length === 0) {
-            feedContainer.innerHTML = '<div class="status-msg">Для данного пользователя пока нет рекомендаций</div>';
-            return;
+        try {
+            const response = await fetch(`/api/recommendations/popular?limit=${limit}`);
+            if (!response.ok) {
+                const message = await parseError(response);
+                throw new Error(message);
+            }
+
+            const products = await response.json();
+            renderProducts(popularEl, products);
+            setStatus(`Популярные товары обновлены: ${products.length}.`, false);
+        } catch (error) {
+            popularEl.innerHTML = "";
+            setStatus(`Ошибка загрузки популярных товаров: ${error.message}`, true);
         }
-
-        feedContainer.innerHTML = products.map(product => `
-                <div class="feed-item">
-                    <div class="image-container">
-                        <img src="${product.imageUrl || 'https://via.placeholder.com/300x200?text=No+Image'}" alt="${product.name}">
-                    </div>
-                    <div class="content">
-                        <span class="tag">${product.category}</span>
-                        <h3 class="title">${product.name}</h3>
-                        <div class="price-tag">$${product.price.toFixed(2)}</div>
-                    </div>
-                </div>
-            `).join('');
     }
+
+    updatePager();
 </script>
 </body>
 </html>
