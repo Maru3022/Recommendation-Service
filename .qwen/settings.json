@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(del *)",
+      "Bash(\"c:\\program files\\git\\cmd\\git.exe\" *)",
+      "Bash(set *)",
+      "Bash(%path%)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ]
+  },
+  "$version": 3
+}
