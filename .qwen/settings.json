@@ -6,7 +6,8 @@
       "Bash(set *)",
       "Bash(%path%)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(git push *)"
     ]
   },
   "$version": 3

@@ -1,4 +1,5 @@
-FROM maven:3.9.6-eclipse-temurin-17 AS build
+# Этап сборки
+FROM maven:3.9.6-eclipse-temurin-21 AS build
 WORKDIR /app
 
 COPY .mvn/ .mvn
@@ -9,7 +10,9 @@ RUN ./mvnw -B -ntp dependency:go-offline
 COPY src/ src/
 RUN ./mvnw -B -ntp clean package -DskipTests
 
-FROM eclipse-temurin:17-jre
+# Этап запуска
+FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
+# Копируем jar с суффиксом -exec, так как он указан в pom.xml
 COPY --from=build /app/target/*-exec.jar app.jar
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
