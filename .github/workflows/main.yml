@@ -146,4 +146,9 @@ jobs:
           echo "Docker Build & Push: ${{ needs.docker-build-and-push.result }}"
           echo "Deploy Staging: ${{ needs.deploy-staging.result }}"
           echo "Deploy Production: ${{ needs.deploy-production.result }}"
-          if [[ "${
+          
+          if [[ "${{ needs.build-and-test.result }}" != "success" || "${{ needs.code-quality.result }}" != "success" || "${{ needs.docker-build-and-push.result }}" != "success" ]]; then
+            echo "Pipeline failed."
+            exit 1
+          fi
+          echo "Pipeline completed successfully."
