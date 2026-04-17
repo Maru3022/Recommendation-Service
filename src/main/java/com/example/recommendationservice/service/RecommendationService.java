@@ -32,7 +32,7 @@ public class RecommendationService {
     private final ElasticsearchOperations elasticsearchOperations;
     private final RedisTemplate<String, Object> redisTemplate;
 
-    @Cacheable(value = "recommendations", key = "#userId + #page", unless = "#result == null")
+    @Cacheable(value = "recommendations", key = "#userId + ':' + #page + ':' + #size", unless = "#result == null")
     public RecommendationResponse getRecommendations(String userId, int page, int size) {
         validatePagination(page, size);
         log.debug("Fetching recommendation for UserID: {} (Page: {}, Size: {})", userId, page, size);
