@@ -42,4 +42,28 @@ public class RecommendationControllerTest {
                 .andExpect(jsonPath("$.currentPage").value(0))
                 .andExpect(jsonPath("$.products").isArray());
     }
+
+    @Test
+    void getRecommendations_WithInvalidPage_ShouldReturnBadRequest() throws Exception {
+        when(recommendationService.getRecommendations("user1",-1,10))
+                .thenThrow(new IllegalArgumentException("page must be greater than or equal to 0"));
+
+        mockMvc.perform(get("/api/recommendations/user1")
+                        .param("page","-1")
+                        .param("size","10")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("page must be greater than or equal to 0"));
+    }
+
+    @Test
+    void getPopular_ShouldReturnOk() throws Exception {
+        when(recommendationService.getPopularProducts(5)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/recommendations/popular")
+                        .param("limit","5")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+    }
 }

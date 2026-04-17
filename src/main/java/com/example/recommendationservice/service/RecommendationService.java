@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.elasticsearch.client.elc.ElasticsearchAggregations;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
@@ -33,10 +34,16 @@ public class RecommendationService {
 
     @Cacheable(value = "recommendations", key = "#userId + #page", unless = "#result == null")
     public RecommendationResponse getRecommendations(String userId, int page, int size) {
+        validatePagination(page, size);
         log.debug("Fetching recommendation for UserID: {} (Page: {}, Size: {})", userId, page, size);
-        String favoriteCategory =
-                (String) redisTemplate.opsForValue()
-                        .get("user:" + userId + ":fav_category");
+        String favoriteCategory = null;
+
+        try {
+            favoriteCategory = (String) redisTemplate.opsForValue()
+                    .get("user:" + userId + ":fav_category");
+        } catch (RedisConnectionFailureException ex) {
+            log.warn("Redis is unavailable, returning non-personalized recommendations for user {}", userId);
+        }
 
         Pageable pageable = PageRequest.of(page, size);
 
@@ -61,6 +68,10 @@ public class RecommendationService {
     }
 
     public List<ProductDoc> getPopularProducts(int limit){
+        if (limit <= 0 || limit > 100) {
+            throw new IllegalArgumentException("limit must be between 1 and 100");
+        }
+
         NativeQuery query = NativeQuery.builder()
                 .withMaxResults(0)
                 .withAggregation("most_popular", Aggregation.of(a -> a
@@ -88,5 +99,15 @@ public class RecommendationService {
         if(popularIds.isEmpty()) return new ArrayList<>();
 
         return productRepository.findAllByIdIn(popularIds);
+    }
+
+    private void validatePagination(int page, int size) {
+        if (page < 0) {
+            throw new IllegalArgumentException("page must be greater than or equal to 0");
+        }
+
+        if (size <= 0 || size > 100) {
+            throw new IllegalArgumentException("size must be between 1 and 100");
+        }
     }
 }

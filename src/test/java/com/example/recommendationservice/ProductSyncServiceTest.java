@@ -9,6 +9,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -35,7 +36,7 @@ public class ProductSyncServiceTest {
 
         when(productSearchRepository.save(any())).thenThrow(new RuntimeException("ES Down"));
 
-        productSyncService.saveProduct(productDoc);
+        assertThrows(RuntimeException.class, () -> productSyncService.saveProduct(productDoc));
         verify(productSearchRepository).save(productDoc);
     }
 

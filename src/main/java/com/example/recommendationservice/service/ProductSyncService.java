@@ -18,6 +18,7 @@ public class ProductSyncService {
             log.debug("ElasticSearch: Product {} successfully indexed", productDoc.getId());
         }catch (Exception e){
             log.error("ElasticSearch: Failed to index product {}. Error: {}", productDoc.getId(), e.getMessage());
+            throw e;
         }
     }
 

@@ -17,7 +17,7 @@ public class GlobalExceptionHandler {
 
         ErrorResponse error = new ErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "Search service is temporality unavailable",
+                "Search service is temporarily unavailable",
                 System.currentTimeMillis()
         );
 
@@ -35,6 +35,19 @@ public class GlobalExceptionHandler {
         );
 
         return new ResponseEntity<>(error, HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalArgumentException(IllegalArgumentException ex){
+        log.warn("Validation error: {}", ex.getMessage());
+
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                ex.getMessage(),
+                System.currentTimeMillis()
+        );
+
+        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(Exception.class)

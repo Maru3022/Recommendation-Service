@@ -4,18 +4,18 @@ import com.example.recommendationservice.repository.ActionRepository;
 import com.example.recommendationservice.repository.ProductSearchRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest
 @ActiveProfiles("test")
 class RecommendationServiceApplicationTests {
 
     // Подменяем Elasticsearch-репозитории, чтобы контекст поднимался без живого ES
-    @MockBean
+    @MockitoBean
     private ProductSearchRepository productSearchRepository;
 
-    @MockBean
+    @MockitoBean
     private ActionRepository actionRepository;
 
     @Test

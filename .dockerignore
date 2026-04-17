@@ -1,0 +1,10 @@
+.git
+.github
+.idea
+.qwen
+target
+monitoring
+k6
+HELP.md
+METHODS_REFERENCE.md
+README.md

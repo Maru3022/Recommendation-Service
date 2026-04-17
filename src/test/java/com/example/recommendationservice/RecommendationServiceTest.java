@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
@@ -20,7 +21,9 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -40,7 +43,7 @@ public class RecommendationServiceTest {
 
     @BeforeEach
     void setUp(){
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
     }
 
     @Test
@@ -74,5 +77,34 @@ public class RecommendationServiceTest {
 
         verify(productSearchRepository).findAll(any(PageRequest.class));
         verify(productSearchRepository,never()).findByCategory(anyString(),any());
+    }
+
+    @Test
+    void getRecommendations_WhenRedisUnavailable_ShouldReturnDefaultProducts(){
+        String userId = "789";
+        when(valueOperations.get(anyString())).thenThrow(new RedisConnectionFailureException("Redis down"));
+
+        List<ProductDoc> products = List.of(new ProductDoc("2","Book","Books",19.0,"url"));
+        Page<ProductDoc> page = new PageImpl<>(products);
+        when(productSearchRepository.findAll(any(PageRequest.class))).thenReturn(page);
+
+        RecommendationResponse response = recommendationService.getRecommendations(userId,0,10);
+
+        assertNotNull(response);
+        assertEquals(1, response.getProducts().size());
+        verify(productSearchRepository).findAll(any(PageRequest.class));
+        verify(productSearchRepository, never()).findByCategory(anyString(), any());
+    }
+
+    @Test
+    void getRecommendations_WithNegativePage_ShouldThrowValidationError() {
+        assertThrows(IllegalArgumentException.class,
+                () -> recommendationService.getRecommendations("user",-1,10));
+    }
+
+    @Test
+    void getPopularProducts_WithInvalidLimit_ShouldThrowValidationError() {
+        assertThrows(IllegalArgumentException.class,
+                () -> recommendationService.getPopularProducts(0));
     }
 }
