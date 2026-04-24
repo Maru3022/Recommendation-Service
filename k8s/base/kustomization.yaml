@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: recommendation-service
+      app.kubernetes.io/part-of: recommendation-platform
+      app.kubernetes.io/component: api
+    includeSelectors: true
+    includeTemplates: true
+
+resources:
+  - deployment.yaml
+  - service.yaml
+  - hpa.yaml
+  - pdb.yaml
+
+configMapGenerator:
+  - name: recommendation-service-config
+    literals:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgresql:5432/recommendation_db
+      - SPRING_ELASTICSEARCH_URIS=http://elasticsearch:9200
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_KAFKA_CONSUMER_GROUP_ID=rec-group
+      - EUREKA_SERVER_URL=http://eureka-server:8761/eureka/
+
+generatorOptions:
+  disableNameSuffixHash: true

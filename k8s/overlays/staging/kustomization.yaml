@@ -1,0 +1,40 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: recommendation-staging
+
+resources:
+  - ../../base
+  - namespace.yaml
+  - ingress.yaml
+
+images:
+  - name: recommendation-service
+    newName: ghcr.io/maru3022/recommendation-service
+    newTag: latest
+
+replicas:
+  - name: recommendation-service
+    count: 2
+
+configMapGenerator:
+  - name: recommendation-service-config
+    behavior: merge
+    literals:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgresql-staging:5432/recommendation_db
+      - SPRING_ELASTICSEARCH_URIS=http://elasticsearch-staging:9200
+      - SPRING_DATA_REDIS_HOST=redis-staging
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka-staging:9092
+      - EUREKA_SERVER_URL=http://eureka-server-staging:8761/eureka/
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+patches:
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: recommendation-service
+    patch: |-
+      - op: replace
+        path: /spec/maxReplicas
+        value: 4

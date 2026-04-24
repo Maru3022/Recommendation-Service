@@ -1,0 +1,59 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: recommendation-production
+
+resources:
+  - ../../base
+  - namespace.yaml
+  - ingress.yaml
+
+images:
+  - name: recommendation-service
+    newName: ghcr.io/maru3022/recommendation-service
+    newTag: latest
+
+replicas:
+  - name: recommendation-service
+    count: 3
+
+configMapGenerator:
+  - name: recommendation-service-config
+    behavior: merge
+    literals:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgresql-production:5432/recommendation_db
+      - SPRING_ELASTICSEARCH_URIS=http://elasticsearch-production:9200
+      - SPRING_DATA_REDIS_HOST=redis-production
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka-production:9092
+      - EUREKA_SERVER_URL=http://eureka-server-production:8761/eureka/
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+patches:
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: recommendation-service
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 8
+  - target:
+      kind: Deployment
+      name: recommendation-service
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 500m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 768Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 1500m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 1536Mi

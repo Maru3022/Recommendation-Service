@@ -1,72 +1,46 @@
-## Recommendation Service
+# Recommendation Service
 
-Recommendation Service — это высокопроизводительный микросервис на Spring Boot, который отдаёт персональные рекомендации товаров.
-Он использует PostgreSQL, Elasticsearch, Redis и Kafka для синхронизации данных.
+Recommendation Service — микросервис на Spring Boot для выдачи персональных и популярных товарных рекомендаций.
+Сервис использует PostgreSQL, Elasticsearch, Redis и Kafka, а теперь подготовлен не только для Docker, но и для полноценного запуска в Kubernetes.
 
----
+## Что умеет сервис
 
-### Возможности
+- `GET /api/recommendations/{userId}?page={page}&size={size}` возвращает персональные рекомендации.
+- `GET /api/recommendations/popular?limit={limit}` возвращает популярные товары.
+- Персонализация строится через Redis по ключу `user:{userId}:fav_category`.
+- Данные товаров синхронизируются через Kafka consumer `product-updates`.
+- Метрики Prometheus и health endpoints доступны через Spring Boot Actuator.
+- Поддержаны readiness/liveness probes и graceful shutdown для Kubernetes rollout.
 
-- **REST API для рекомендаций**
-  - `GET /api/recommendations/{userId}?page={page}&size={size}`
-  - Возвращает объект `RecommendationResponse` с:
-    - списком товаров;
-    - текущей страницей;
-    - общим количеством элементов;
-    - флагом `hasNext` (есть ли следующая страница).
+## Технологии
 
-- **Персонализация через Redis**
-  - Любимая категория пользователя читается из ключа `user:{userId}:fav_category` в Redis.
-  - Если категория есть → поиск только по этой категории в Elasticsearch.
-  - Если категории нет → дефолтный поиск по всем товарам.
+- Java 21
+- Spring Boot 3
+- Spring Data JPA
+- Spring Data Elasticsearch
+- Spring Data Redis
+- Spring Kafka
+- PostgreSQL
+- Docker
+- Kubernetes + Kustomize overlays
+- GitHub Actions CI/CD
 
-- **Поиск и хранение в Elasticsearch**
-  - `ProductSearchRepository` — поиск товаров.
-  - `ActionRepository` — хранение пользовательских действий (просмотры, клики и т.п.).
-  - Индексы создаются автоматически через Spring Data Elasticsearch.
+## Локальный запуск
 
-- **Синхронизация товаров из Kafka**
-  - `ProductSyncConsumer` слушает топик `product-updates` (группа `rec-group`).
-  - Каждый полученный `ProductDoc` сохраняется в Elasticsearch через `ProductSyncService`.
+Требования:
 
-- **Обработка ошибок и устойчивость**
-  - `GlobalExceptionHandler`:
-    - проблемы с Elasticsearch (нет индекса) → HTTP `500`;
-    - падение Redis → HTTP `503` и сообщение _"Personalization data source error"_;
-    - любые неожиданные ошибки → HTTP `500` с безопасным текстом.
+- JDK 21+
+- Maven или Maven Wrapper
+- PostgreSQL
+- Elasticsearch
+- Redis
+- Kafka
 
-- **Готовый CI/CD**
-  - GitHub Actions:
-    - собирает JAR;
-    - запускает `mvn test` с H2 (in‑memory) для тестов;
-    - собирает и публикует Docker-образ.
-
----
-
-### Технологии
-
-- **Backend**: Java 17, Spring Boot 3 (`spring-boot-starter-web`, Data JPA, Data Redis, Data Elasticsearch, Spring Kafka)
-- **Хранилища**: PostgreSQL, Elasticsearch, Redis
-- **Сообщения**: Kafka
-- **Инфраструктура**: Docker, GitHub Actions
-
----
-
-## Быстрый старт
-
-### Локальный запуск
-
-**Требования**:
-- JDK 17+;
-- Maven;
-- запущенные PostgreSQL, Elasticsearch, Redis и Kafka
-  (либо адаптировать `src/main/resources/application.properties` под своё окружение).
-
-Шаги:
+Команды:
 
 ```bash
-mvn clean package
-mvn spring-boot:run
+./mvnw clean test
+./mvnw spring-boot:run
 ```
 
 Сервис будет доступен по адресу:
@@ -75,51 +49,145 @@ mvn spring-boot:run
 http://localhost:8026
 ```
 
-Основной эндпоинт:
+## Конфигурация через переменные окружения
+
+Основные runtime-параметры вынесены во внешние env vars:
+
+- `SPRING_DATASOURCE_URL`
+- `SPRING_DATASOURCE_USERNAME`
+- `SPRING_DATASOURCE_PASSWORD`
+- `SPRING_ELASTICSEARCH_URIS`
+- `SPRING_DATA_REDIS_HOST`
+- `SPRING_DATA_REDIS_PORT`
+- `SPRING_KAFKA_BOOTSTRAP_SERVERS`
+- `SPRING_KAFKA_CONSUMER_GROUP_ID`
+- `EUREKA_SERVER_URL`
+
+Это позволяет без перепаковки образа использовать разные конфигурации для staging и production.
+
+## Docker
+
+Контейнер собирается через multi-stage Dockerfile:
+
+- build stage использует Maven + Temurin 21
+- runtime stage использует Temurin 21 JRE Alpine
+- `mvnw` получает executable permission в контейнере
+- приложение запускается от non-root пользователя `spring`
+
+Сборка образа:
+
+```bash
+docker build -t recommendation-service:local .
+```
+
+## Kubernetes
+
+В репозитории добавлена структура `k8s/`:
 
 ```text
-GET /api/recommendations/{userId}?page=0&size=10
+k8s/
+  base/
+    deployment.yaml
+    service.yaml
+    hpa.yaml
+    pdb.yaml
+    kustomization.yaml
+    secret.example.yaml
+  overlays/
+    staging/
+    production/
 ```
 
-Пример запроса:
+### Что уже предусмотрено
+
+- `Deployment` с rolling update стратегией
+- `Service`
+- `HorizontalPodAutoscaler`
+- `PodDisruptionBudget`
+- `Prometheus` annotations
+- `startupProbe`, `readinessProbe`, `livenessProbe`
+- отдельные overlays для `staging` и `production`
+- разные namespace для окружений
+- ingress для каждого окружения
+- внешний secret для чувствительных данных
+
+### Подготовка секретов
+
+В репозиторий добавлен шаблон:
+
+```text
+k8s/base/secret.example.yaml
+```
+
+Перед деплоем создай реальный secret на основе этого шаблона и не коммить его в репозиторий.
+
+Для pull из GHCR кластеру также понадобится `imagePullSecret` с именем `ghcr-pull-secret`.
+
+### Рендеринг manifests
 
 ```bash
-curl "http://localhost:8026/api/recommendations/some_user?page=0&size=10"
+kubectl kustomize k8s/overlays/staging
+kubectl kustomize k8s/overlays/production
 ```
 
----
-
-### Запуск тестов
-
-- **Юнит‑ и интеграционные тесты** (in‑memory H2):
+### Деплой вручную
 
 ```bash
-mvn test
+kubectl apply -k k8s/overlays/staging
+kubectl apply -k k8s/overlays/production
 ```
 
-Тестовый профиль:
-- использует H2 вместо PostgreSQL;
-- мокает Elasticsearch‑репозитории и отключает Kafka‑листенеры;
-- позволяет гонять тесты без внешних сервисов.
+## CI/CD
 
----
+Workflow находится в:
 
-## CI/CD (GitHub Actions)
+```text
+.github/workflows/main.yml
+```
 
-Workflow описан в `.github/workflows/main.yml` и делает следующее:
+### Что делает pipeline
 
-1. **Checkout и настройка JDK**
-   - `actions/checkout@v4`;
-   - `actions/setup-java@v4` c Java 17.
+1. Гоняет тесты на Java 21.
+2. Выполняет `clean verify` на основной версии Java 21.
+3. Рендерит Kubernetes overlays и валидирует их через `kubectl apply --dry-run=client`.
+4. Собирает Docker image.
+5. На `main` пушит image в GHCR с тегами:
+   - `latest`
+   - `${github.sha}`
+6. Деплоит staging через `kubectl apply -k`.
+7. После staging обновляет образ в deployment и ждет rollout.
+8. Затем тем же способом деплоит production.
 
-2. **Сборка приложения**
-   - `mvn clean package -DskipTests`.
+### Какие secrets нужны в GitHub Actions
 
-3. **Docker Build & Push**
-   - Собирает Docker-образ;
-   - Публикует в GitHub Container Registry (GHCR).
+- `KUBE_CONFIG_STAGING` — base64 kubeconfig для staging-кластера
+- `KUBE_CONFIG_PRODUCTION` — base64 kubeconfig для production-кластера
 
-4. **Deploy**
-   - Staging и Production деплой (настраивается через environments).
+`GITHUB_TOKEN` используется для публикации образа в GHCR автоматически.
+Если `KUBE_CONFIG_STAGING` или `KUBE_CONFIG_PRODUCTION` не заданы, соответствующий deploy job будет автоматически пропущен, а build и publish этапы продолжат работать.
 
-Благодаря этому репозиторий можно использовать как готовый пример production‑подобного recommendation‑сервиса с CI/CD.
+## Health endpoints для Kubernetes
+
+Используются стандартные Spring Boot Actuator endpoints:
+
+- `/actuator/health/liveness`
+- `/actuator/health/readiness`
+- `/actuator/prometheus`
+
+## Проверка проекта
+
+Основная локальная проверка:
+
+```bash
+./mvnw -B -ntp clean test
+./mvnw -B -ntp clean verify -DskipTests
+```
+
+## Что важно помнить
+
+- Kubernetes manifests предполагают, что PostgreSQL, Kafka, Redis и Elasticsearch уже доступны в соответствующем окружении.
+- Хосты ingress в overlays заданы как шаблонные:
+  - `recommendation-staging.example.com`
+  - `recommendation.example.com`
+  Их нужно заменить на реальные домены.
+- Если планируется реальный production rollout, стоит добавить sealed secrets или внешний secret manager.

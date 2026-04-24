@@ -1,4 +1,3 @@
-# Этап сборки
 FROM maven:3.9.6-eclipse-temurin-21 AS build
 WORKDIR /app
 
@@ -10,9 +9,10 @@ RUN ./mvnw -B -ntp dependency:go-offline
 COPY src/ src/
 RUN ./mvnw -B -ntp clean package -DskipTests
 
-# Этап запуска
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-# Копируем jar с суффиксом -exec, так как он указан в pom.xml
+RUN addgroup -S spring && adduser -S spring -G spring
 COPY --from=build /app/target/*-exec.jar app.jar
+RUN chown spring:spring /app/app.jar
+USER spring
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
