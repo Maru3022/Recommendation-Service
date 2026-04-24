@@ -189,7 +189,7 @@ jobs:
     name: Deploy to Staging
     runs-on: ubuntu-latest
     needs: docker-build-and-push
-    if: github.event_name != 'pull_request' && secrets.KUBE_CONFIG_STAGING != ''
+    if: github.event_name != 'pull_request'
     timeout-minutes: 15
     environment:
       name: staging
@@ -197,7 +197,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check staging kubeconfig availability
+        id: precheck
+        shell: bash
+        env:
+          KUBE_CONFIG_STAGING: ${{ secrets.KUBE_CONFIG_STAGING }}
+        run: |
+          if [[ -n "$KUBE_CONFIG_STAGING" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip staging deploy when kubeconfig is missing
+        if: steps.precheck.outputs.configured != 'true'
+        run: echo "KUBE_CONFIG_STAGING is not set. Skipping staging deployment."
+
       - name: Install kubectl
+        if: steps.precheck.outputs.configured == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -207,25 +224,29 @@ jobs:
           sudo mv kubectl /usr/local/bin/kubectl
 
       - name: Configure kubeconfig
+        if: steps.precheck.outputs.configured == 'true'
         shell: bash
         run: |
           mkdir -p "$HOME/.kube"
           echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > "$HOME/.kube/config"
 
       - name: Apply staging manifests
+        if: steps.precheck.outputs.configured == 'true'
         run: kubectl apply -k k8s/overlays/staging
 
       - name: Update staging image
+        if: steps.precheck.outputs.configured == 'true'
         run: kubectl set image deployment/recommendation-service recommendation-service=${{ needs.docker-build-and-push.outputs.image }} -n recommendation-staging
 
       - name: Wait for staging rollout
+        if: steps.precheck.outputs.configured == 'true'
         run: kubectl rollout status deployment/recommendation-service -n recommendation-staging --timeout=180s
 
   deploy-production:
     name: Deploy to Production
     runs-on: ubuntu-latest
     needs: [docker-build-and-push, deploy-staging]
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && secrets.KUBE_CONFIG_PRODUCTION != ''
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     timeout-minutes: 15
     environment:
       name: production
@@ -233,7 +254,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check production kubeconfig availability
+        id: precheck
+        shell: bash
+        env:
+          KUBE_CONFIG_PRODUCTION: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+        run: |
+          if [[ -n "$KUBE_CONFIG_PRODUCTION" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip production deploy when kubeconfig is missing
+        if: steps.precheck.outputs.configured != 'true'
+        run: echo "KUBE_CONFIG_PRODUCTION is not set. Skipping production deployment."
+
       - name: Install kubectl
+        if: steps.precheck.outputs.configured == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -243,18 +281,22 @@ jobs:
           sudo mv kubectl /usr/local/bin/kubectl
 
       - name: Configure kubeconfig
+        if: steps.precheck.outputs.configured == 'true'
         shell: bash
         run: |
           mkdir -p "$HOME/.kube"
           echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > "$HOME/.kube/config"
 
       - name: Apply production manifests
+        if: steps.precheck.outputs.configured == 'true'
         run: kubectl apply -k k8s/overlays/production
 
       - name: Update production image
+        if: steps.precheck.outputs.configured == 'true'
         run: kubectl set image deployment/recommendation-service recommendation-service=${{ needs.docker-build-and-push.outputs.image }} -n recommendation-production
 
       - name: Wait for production rollout
+        if: steps.precheck.outputs.configured == 'true'
         run: kubectl rollout status deployment/recommendation-service -n recommendation-production --timeout=180s
 
   notify:
