@@ -214,13 +214,15 @@ jobs:
 
       - name: Generate SBOM and scan
         if: github.event_name != 'pull_request'
-        run: |
-          docker buildx build \
-            --platform=linux/amd64 \
-            --load \
-            --sbom=true \
-            --provenance=false \
-            -t temp-image .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          platforms: linux/amd64
+          load: true
+          tags: recommendation-service:sbom
+          sbom: true
+          provenance: false
 
       - name: Build image for pull requests
         if: github.event_name == 'pull_request'
