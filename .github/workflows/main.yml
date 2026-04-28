@@ -75,9 +75,29 @@ jobs:
       - name: Verify compilation from a clean state
         run: mvn -B -ntp -DskipTests clean verify
 
+      - name: Cache OWASP Dependency-Check data
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: dependency-check-data-${{ runner.os }}-${{ hashFiles('pom.xml') }}
+          restore-keys: |
+            dependency-check-data-${{ runner.os }}-
+
       - name: Run OWASP Dependency Check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: mvn -B -ntp dependency-check:check -Psecurity-scan
         continue-on-error: true
+
+      - name: Upload OWASP Dependency-Check reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: |
+            target/dependency-check-report.html
+            target/dependency-check-report.json
+          if-no-files-found: warn
 
       - name: Generate SBOM
         run: mvn cyclonedx:makeAggregateBom

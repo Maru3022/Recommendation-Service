@@ -1,24 +1,36 @@
 # Recommendation Service
 
-A comprehensive recommendation microservice built with Spring Boot that provides personalized and popular product recommendations. The service uses PostgreSQL, Elasticsearch, Redis, and Kafka, and is fully containerized for both Docker and Kubernetes deployments.
+Recommendation microservice on Spring Boot (Java 21) that provides:
 
-## 🚀 Features
+- **Personalized recommendations** (Redis preference key → Elasticsearch search)
+- **Popular products** (Elasticsearch aggregation over user actions)
+- **Collaborative / Content-based / Trending** modes (baseline algorithms in code)
+- **User action tracking** (writes to Elasticsearch + updates Redis preference signals)
+- **Realtime product sync** from Kafka to Elasticsearch
+- **OpenAPI UI** and Actuator metrics
 
-### Core Functionality
-- **Personalized Recommendations**: Category-based personalization using Redis user preferences
-- **Popular Products**: Most viewed/liked products across all users
-- **Collaborative Filtering**: Recommendations based on similar users' behavior
-- **Content-Based Filtering**: Recommendations based on user's category preferences
-- **Trending Products**: Currently popular items based on recent activity
-- **User Action Tracking**: Track views, likes, and cart additions
+This repository contains:
+- backend (`src/main/java`)
+- React frontend (`frontend/`)
+- Kubernetes manifests (`k8s/`)
+- monitoring configs (`monitoring/`)
+- CI/CD workflow (`.github/workflows/main.yml`)
 
-### Technical Features
-- **Real-time Updates**: Kafka-based product synchronization
-- **High Performance**: Redis caching and Elasticsearch for fast search
-- **Scalable Architecture**: Microservice design with horizontal scaling support
-- **Comprehensive Monitoring**: Prometheus metrics and health endpoints
-- **API Documentation**: OpenAPI/Swagger documentation
-- **Modern Frontend**: React.js interface with Tailwind CSS
+## 🚀 Features (as implemented)
+
+### Recommendations API
+- `GET /api/recommendations/{userId}?page=&size=` — personalized (uses Redis key `user:{userId}:fav_category`)
+- `GET /api/recommendations/popular?limit=` — popular products
+- `GET /api/recommendations/{userId}/collaborative?limit=` — collaborative baseline
+- `GET /api/recommendations/{userId}/content-based?limit=` — content-based baseline
+- `GET /api/recommendations/trending?limit=` — trending baseline
+
+### User actions API
+- `POST /api/user-actions` — track action (`userId`, `productId`, `actionType`)
+- `GET /api/user-actions/{userId}/history` — fetch action history
+
+### Observability
+- `GET /actuator/health`, `GET /actuator/metrics`, `GET /actuator/prometheus`
 
 ## 🛠 Technology Stack
 
@@ -43,6 +55,13 @@ A comprehensive recommendation microservice built with Spring Boot that provides
 - **Kubernetes** with Kustomize overlays
 - **GitHub Actions** for CI/CD
 - **H2** for testing
+
+## ⚠️ Notes about this repository
+
+- There is **no** `docker-compose.yml` in this repo by design. For local runs you can use your own infra (PostgreSQL/Redis/Elasticsearch/Kafka) or Kubernetes.
+- There are **two UI options**:
+  - `frontend/` — React app (recommended for development)
+  - `src/main/resources/static/index.html` — built-in static page served by Spring Boot (no build step)
 
 ## 📡 API Documentation
 
@@ -87,30 +106,27 @@ curl -X POST "http://localhost:8026/api/user-actions" \
 ### Prerequisites
 - **Java 21+** and Maven
 - **Node.js 16+** and npm (for frontend)
-- **Docker** and **Docker Compose** (for infrastructure)
+- One of the following:
+  - local infrastructure (PostgreSQL, Elasticsearch, Redis, Kafka)
+  - Kubernetes cluster (see `k8s/`)
 
-### 1. Start Infrastructure Services
-```bash
-docker-compose -f docker-compose.dev.yml up -d
-```
-
-### 2. Start Backend Service
+### 1. Start Backend Service
 ```bash
 ./mvnw spring-boot:run
 ```
 
-### 3. Start Frontend (New Terminal)
+### 2. Start React Frontend (New Terminal)
 ```bash
 cd frontend
 npm install
 npm start
 ```
 
-### 4. Access the Application
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8026
-- **API Documentation**: http://localhost:8026/swagger-ui.html
-- **Kafka UI**: http://localhost:8080 (optional)
+### 3. Access
+- **React frontend**: `http://localhost:3000`
+- **Backend API**: `http://localhost:8026`
+- **OpenAPI UI**: `http://localhost:8026/swagger-ui.html`
+- **Static built-in UI**: `http://localhost:8026/`
 
 ## 🧪 Testing
 
