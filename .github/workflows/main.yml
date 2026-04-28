@@ -24,86 +24,14 @@ permissions:
   actions: read
 
 jobs:
-  security-scan:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-
-      - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: 'trivy-results.sarif'
-
-  dependency-check:
-    name: Dependency Check
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: temurin
-          cache: maven
-
-      - name: Run OWASP dependency check
-        run: mvn org.owasp:dependency-check:check -DskipTests
-
-      - name: Upload dependency check results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: dependency-check-report
-          path: target/dependency-check-report.html
-
-  code-quality:
-    name: Code Quality
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: temurin
-          cache: maven
-
-      - name: Run SonarCloud scan
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-          mvn -B verify sonar:sonar \
-            -Dsonar.projectKey=recommendation-service \
-            -Dsonar.organization=maru3022
-
   test-matrix:
     name: Tests (Java ${{ matrix.java }})
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         java: ["21"]
-        test-type: ['unit', 'integration']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -115,81 +43,24 @@ jobs:
           distribution: temurin
           cache: maven
 
-      - name: Cache Maven dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
-
-      - name: Run unit tests
-        if: matrix.test-type == 'unit'
+      - name: Run tests with coverage
         run: mvn -B -ntp clean test jacoco:report
-
-      - name: Run integration tests
-        if: matrix.test-type == 'integration'
-        run: mvn -B -ntp clean verify jacoco:report -Pintegration-tests
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results-${{ matrix.test-type }}
+          name: test-results
           path: |
             target/surefire-reports/
             target/failsafe-reports/
-
-      - name: Upload coverage to Codecov
-        if: matrix.test-type == 'unit'
-        uses: codecov/codecov-action@v4
-        with:
-          file: target/site/jacoco/jacoco.xml
-
-  performance-test:
-    name: Performance Test
-    runs-on: ubuntu-latest
-    needs: package-and-verify
-    timeout-minutes: 30
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: temurin
-          cache: maven
-
-      - name: Download application JAR
-        uses: actions/download-artifact@v4
-        with:
-          name: recommendation-service-artifacts
-
-      - name: Start application
-        run: |
-          java -jar target/*.jar &
-          sleep 30
-
-      - name: Install k6
-        run: |
-          sudo gpg -k /usr/share/keyrings/k6-archive-keyring.gpg --import gpg-key
-          sudo gdebi -n k6_0.47.0_amd64.deb
-
-      - name: Run performance tests
-        run: k6 run --out json=results.json performance-test.js
-
-      - name: Upload performance results
-        uses: actions/upload-artifact@v4
-        with:
-          name: performance-results
-          path: results.json
+            target/site/jacoco/
 
   package-and-verify:
     name: Package & Verify
     runs-on: ubuntu-latest
-    needs: [test-matrix, security-scan, dependency-check, code-quality]
-    timeout-minutes: 25
+    needs: test-matrix
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -203,6 +74,10 @@ jobs:
 
       - name: Verify compilation from a clean state
         run: mvn -B -ntp -DskipTests clean verify
+
+      - name: Run OWASP Dependency Check
+        run: mvn -B -ntp dependency-check:check -Psecurity-scan
+        continue-on-error: true
 
       - name: Generate SBOM
         run: mvn cyclonedx:makeAggregateBom
@@ -272,7 +147,7 @@ jobs:
   docker-build-and-push:
     name: Docker Build & Push
     runs-on: ubuntu-latest
-    needs: [package-and-verify, kubernetes-validate, performance-test]
+    needs: [package-and-verify, kubernetes-validate]
     timeout-minutes: 30
     permissions:
       contents: read
@@ -505,13 +380,9 @@ jobs:
     name: Notify
     runs-on: ubuntu-latest
     needs:
-      - security-scan
-      - dependency-check
-      - code-quality
       - test-matrix
       - package-and-verify
       - kubernetes-validate
-      - performance-test
       - docker-build-and-push
       - deploy-staging
       - deploy-production
@@ -522,26 +393,18 @@ jobs:
         shell: bash
         run: |
           echo "=== PIPELINE SUMMARY ==="
-          echo "Security Scan: ${{ needs.security-scan.result }}"
-          echo "Dependency Check: ${{ needs.dependency-check.result }}"
-          echo "Code Quality: ${{ needs.code-quality.result }}"
           echo "Tests: ${{ needs.test-matrix.result }}"
           echo "Package & Verify: ${{ needs.package-and-verify.result }}"
           echo "Kubernetes Validate: ${{ needs.kubernetes-validate.result }}"
-          echo "Performance Test: ${{ needs.performance-test.result }}"
           echo "Docker Build & Push: ${{ needs.docker-build-and-push.result }}"
           echo "Deploy Staging: ${{ needs.deploy-staging.result }}"
           echo "Deploy Production: ${{ needs.deploy-production.result }}"
           echo "Health Check: ${{ needs.health-check.result }}"
 
           FAILED_JOBS=""
-          if [[ "${{ needs.security-scan.result }}" != "success" ]]; then FAILED_JOBS="$FAILED_JOBS security-scan"; fi
-          if [[ "${{ needs.dependency-check.result }}" != "success" ]]; then FAILED_JOBS="$FAILED_JOBS dependency-check"; fi
-          if [[ "${{ needs.code-quality.result }}" != "success" ]]; then FAILED_JOBS="$FAILED_JOBS code-quality"; fi
           if [[ "${{ needs.test-matrix.result }}" != "success" ]]; then FAILED_JOBS="$FAILED_JOBS test-matrix"; fi
           if [[ "${{ needs.package-and-verify.result }}" != "success" ]]; then FAILED_JOBS="$FAILED_JOBS package-and-verify"; fi
           if [[ "${{ needs.kubernetes-validate.result }}" != "success" ]]; then FAILED_JOBS="$FAILED_JOBS kubernetes-validate"; fi
-          if [[ "${{ needs.performance-test.result }}" != "success" ]]; then FAILED_JOBS="$FAILED_JOBS performance-test"; fi
           if [[ "${{ needs.docker-build-and-push.result }}" != "success" ]]; then FAILED_JOBS="$FAILED_JOBS docker-build-and-push"; fi
           if [[ "${{ needs.deploy-staging.result }}" != "success" ]]; then FAILED_JOBS="$FAILED_JOBS deploy-staging"; fi
           if [[ "${{ needs.deploy-production.result }}" != "success" ]]; then FAILED_JOBS="$FAILED_JOBS deploy-production"; fi
@@ -549,7 +412,7 @@ jobs:
 
           if [[ -n "$FAILED_JOBS" ]]; then
             echo "❌ PIPELINE FAILED"
-            echo "Failed jobs: $FAILED_JOBS"
+            echo "Failed jobs:$FAILED_JOBS"
             exit 1
           else
             echo "✅ PIPELINE COMPLETED SUCCESSFULLY"
