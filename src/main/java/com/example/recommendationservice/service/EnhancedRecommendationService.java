@@ -92,7 +92,12 @@ public class EnhancedRecommendationService {
             List<ProductDoc> allProducts = new ArrayList<>();
             for (String category : preferredCategories) {
                 Pageable pageable = PageRequest.of(0, limit / preferredCategories.size());
-                allProducts.addAll(productRepository.findByCategory(category, pageable).getContent());
+                var page = productRepository.findByCategory(category, pageable);
+                if (page == null || page.getContent() == null) {
+                    log.debug("No products returned for category '{}' (userId={})", category, userId);
+                    continue;
+                }
+                allProducts.addAll(page.getContent());
             }
 
             // Remove already interacted products
