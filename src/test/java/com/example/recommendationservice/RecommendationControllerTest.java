@@ -3,6 +3,7 @@ package com.example.recommendationservice;
 import com.example.recommendationservice.controller.RecommendationController;
 import com.example.recommendationservice.model.RecommendationResponse;
 import com.example.recommendationservice.service.RecommendationService;
+import com.example.recommendationservice.service.EnhancedRecommendationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -26,6 +27,9 @@ public class RecommendationControllerTest {
 
     @MockitoBean
     private RecommendationService recommendationService;
+
+    @MockitoBean
+    private EnhancedRecommendationService enhancedRecommendationService;
 
     @Test
     void getRecommendations_ShouldReturnOk() throws Exception{

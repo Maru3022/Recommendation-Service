@@ -32,6 +32,9 @@ public class EnhancedRecommendationServiceTest {
     @Mock
     private RedisTemplate<String, Object> redisTemplate;
 
+    @Mock
+    private org.springframework.data.redis.core.HashOperations<String, Object, Object> hashOperations;
+
     @InjectMocks
     private EnhancedRecommendationService enhancedRecommendationService;
 
@@ -44,6 +47,9 @@ public class EnhancedRecommendationServiceTest {
             new ProductDoc("2", "Book", "Books", 19.0, "url2"),
             new ProductDoc("3", "Shirt", "Fashion", 49.0, "url3")
         );
+        
+        // Setup RedisTemplate mock to return HashOperations
+        org.mockito.Mockito.lenient().when(redisTemplate.opsForHash()).thenReturn(hashOperations);
     }
 
     @Test
@@ -78,7 +84,8 @@ public class EnhancedRecommendationServiceTest {
     void getContentBasedRecommendations_WithPreferences_ShouldReturnRecommendations() {
         // Given
         String userId = "user1";
-        when(redisTemplate.opsForHash().entries(anyString())).thenReturn(java.util.Map.of("Electronics", 5L, "Books", 3L));
+        java.util.Map<Object, Object> preferences = java.util.Map.of("Electronics", 5L, "Books", 3L);
+        when(hashOperations.entries(anyString())).thenReturn(preferences);
         
         when(productRepository.findByCategory(eq("Electronics"), any())).thenReturn(
             new org.springframework.data.domain.PageImpl<>(Arrays.asList(sampleProducts.get(0)))
@@ -89,7 +96,7 @@ public class EnhancedRecommendationServiceTest {
 
         // Then
         assertNotNull(result);
-        verify(redisTemplate).opsForHash().entries(anyString());
+        verify(hashOperations).entries(anyString());
         verify(productRepository).findByCategory(eq("Electronics"), any());
     }
 
@@ -135,12 +142,13 @@ public class EnhancedRecommendationServiceTest {
     void getContentBasedRecommendations_WithNoPreferences_ShouldReturnEmpty() {
         // Given
         String userId = "user1";
-        when(redisTemplate.opsForHash().entries(anyString())).thenReturn(java.util.Map.of());
+        when(hashOperations.entries(anyString())).thenReturn(java.util.Map.of());
 
         // When
         List<ProductDoc> result = enhancedRecommendationService.getContentBasedRecommendations(userId, 5);
 
         // Then
         assertTrue(result.isEmpty());
+        verify(hashOperations).entries(anyString());
     }
 }
