@@ -31,3 +31,11 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Replit ###
+replit-setup.patch.txt
+_local_exports_replit-setup.patch.txt*
+.replit
+replit.nix
+cleanup_replit.bat
+cleanup_replit.js
