@@ -16,6 +16,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: recommendation-service
   MAVEN_OPTS: "-Xmx1024m"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 permissions:
   contents: read
@@ -215,6 +216,7 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           docker buildx build \
+            --platform=linux/amd64 \
             --load \
             --sbom=true \
             --provenance=false \
