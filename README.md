@@ -1,29 +1,207 @@
 # Recommendation Service
 
-Recommendation Service — микросервис на Spring Boot для выдачи персональных и популярных товарных рекомендаций.
-Сервис использует PostgreSQL, Elasticsearch, Redis и Kafka, а теперь подготовлен не только для Docker, но и для полноценного запуска в Kubernetes.
+A comprehensive recommendation microservice built with Spring Boot that provides personalized and popular product recommendations. The service uses PostgreSQL, Elasticsearch, Redis, and Kafka, and is fully containerized for both Docker and Kubernetes deployments.
 
-## Что умеет сервис
+## 🚀 Features
 
-- `GET /api/recommendations/{userId}?page={page}&size={size}` возвращает персональные рекомендации.
-- `GET /api/recommendations/popular?limit={limit}` возвращает популярные товары.
-- Персонализация строится через Redis по ключу `user:{userId}:fav_category`.
-- Данные товаров синхронизируются через Kafka consumer `product-updates`.
-- Метрики Prometheus и health endpoints доступны через Spring Boot Actuator.
-- Поддержаны readiness/liveness probes и graceful shutdown для Kubernetes rollout.
+### Core Functionality
+- **Personalized Recommendations**: Category-based personalization using Redis user preferences
+- **Popular Products**: Most viewed/liked products across all users
+- **Collaborative Filtering**: Recommendations based on similar users' behavior
+- **Content-Based Filtering**: Recommendations based on user's category preferences
+- **Trending Products**: Currently popular items based on recent activity
+- **User Action Tracking**: Track views, likes, and cart additions
 
-## Технологии
+### Technical Features
+- **Real-time Updates**: Kafka-based product synchronization
+- **High Performance**: Redis caching and Elasticsearch for fast search
+- **Scalable Architecture**: Microservice design with horizontal scaling support
+- **Comprehensive Monitoring**: Prometheus metrics and health endpoints
+- **API Documentation**: OpenAPI/Swagger documentation
+- **Modern Frontend**: React.js interface with Tailwind CSS
 
-- Java 21
-- Spring Boot 3
-- Spring Data JPA
-- Spring Data Elasticsearch
-- Spring Data Redis
-- Spring Kafka
-- PostgreSQL
-- Docker
-- Kubernetes + Kustomize overlays
-- GitHub Actions CI/CD
+## 🛠 Technology Stack
+
+### Backend
+- **Java 21** with Spring Boot 3.4.2
+- **Spring Data JPA** with PostgreSQL
+- **Spring Data Elasticsearch** for product search
+- **Spring Data Redis** for caching and user preferences
+- **Spring Kafka** for real-time product updates
+- **Spring Boot Validation** for input validation
+- **SpringDoc OpenAPI** for API documentation
+- **Micrometer Prometheus** for metrics
+
+### Frontend
+- **React 18** with modern hooks
+- **Tailwind CSS** for styling
+- **Axios** for API communication
+- **Lucide React** for icons
+
+### Infrastructure
+- **Docker** with multi-stage builds
+- **Kubernetes** with Kustomize overlays
+- **GitHub Actions** for CI/CD
+- **H2** for testing
+
+## 📡 API Documentation
+
+### Base URL
+- Development: `http://localhost:8026`
+- Production: `https://api.recommendation-service.com`
+
+### Endpoints
+
+#### Recommendations
+- `GET /api/recommendations/{userId}` - Get personalized recommendations
+- `GET /api/recommendations/popular` - Get popular products
+- `GET /api/recommendations/{userId}/collaborative` - Collaborative filtering recommendations
+- `GET /api/recommendations/{userId}/content-based` - Content-based recommendations
+- `GET /api/recommendations/trending` - Get trending products
+
+#### User Actions
+- `POST /api/user-actions` - Track user interaction
+- `GET /api/user-actions/{userId}/history` - Get user action history
+
+#### Documentation
+- `GET /swagger-ui.html` - Interactive API documentation
+- `GET /v3/api-docs` - OpenAPI specification
+
+### Example Requests
+
+```bash
+# Get personalized recommendations
+curl "http://localhost:8026/api/recommendations/user1?page=0&size=10"
+
+# Get popular products
+curl "http://localhost:8026/api/recommendations/popular?limit=20"
+
+# Track user action
+curl -X POST "http://localhost:8026/api/user-actions" \
+  -H "Content-Type: application/json" \
+  -d '{"userId":"user1","productId":"123","actionType":"view"}'
+```
+
+## 🚀 Quick Start
+
+### Prerequisites
+- **Java 21+** and Maven
+- **Node.js 16+** and npm (for frontend)
+- **Docker** and **Docker Compose** (for infrastructure)
+
+### 1. Start Infrastructure Services
+```bash
+docker-compose -f docker-compose.dev.yml up -d
+```
+
+### 2. Start Backend Service
+```bash
+./mvnw spring-boot:run
+```
+
+### 3. Start Frontend (New Terminal)
+```bash
+cd frontend
+npm install
+npm start
+```
+
+### 4. Access the Application
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8026
+- **API Documentation**: http://localhost:8026/swagger-ui.html
+- **Kafka UI**: http://localhost:8080 (optional)
+
+## 🧪 Testing
+
+### Run Backend Tests
+```bash
+./mvnw test
+```
+
+### Run Frontend Tests
+```bash
+cd frontend
+npm test
+```
+
+### Test Coverage
+- Unit tests for all service layers
+- Integration tests for API endpoints
+- Controller tests with MockMvc
+- Frontend component tests
+
+## 📦 Deployment
+
+### Docker Build
+```bash
+docker build -t recommendation-service:latest .
+```
+
+### Kubernetes Deployment
+```bash
+# Deploy to staging
+kubectl apply -k k8s/overlays/staging
+
+# Deploy to production
+kubectl apply -k k8s/overlays/production
+```
+
+### Environment Variables
+- `SPRING_DATASOURCE_URL` - PostgreSQL connection
+- `SPRING_ELASTICSEARCH_URIS` - Elasticsearch nodes
+- `SPRING_DATA_REDIS_HOST` - Redis server
+- `SPRING_KAFKA_BOOTSTRAP_SERVERS` - Kafka brokers
+- `EUREKA_SERVER_URL` - Service discovery
+
+## 📊 Monitoring
+
+### Health Endpoints
+- `/actuator/health` - Overall health
+- `/actuator/health/liveness` - Liveness probe
+- `/actuator/health/readiness` - Readiness probe
+
+### Metrics
+- `/actuator/prometheus` - Prometheus metrics
+- `/actuator/metrics` - Spring Boot metrics
+
+### Key Metrics
+- Request duration and count
+- Recommendation generation time
+- Cache hit rates
+- Database connection pool status
+
+## 🔧 Configuration
+
+### Profiles
+- `dev` - Development with H2 database
+- `default` - Production-ready configuration
+- `test` - Testing configuration
+
+### Caching Strategy
+- **Redis**: User preferences and session data
+- **Application Cache**: Popular products (TTL: 5 minutes)
+- **Elasticsearch**: Product search and aggregations
+
+### Recommendation Algorithms
+1. **Category-based**: User's favorite categories from Redis
+2. **Collaborative**: Similar users' behavior patterns
+3. **Content-based**: Category preference matching
+4. **Trending**: Recent activity analysis
+
+## 🛡 Security
+
+### Implemented Measures
+- **CORS**: Configured for specific origins
+- **Input Validation**: Bean validation on all inputs
+- **Rate Limiting**: Configurable request limits
+- **Error Handling**: Sanitized error responses
+
+### Best Practices
+- No sensitive data in logs
+- Secure defaults for all configurations
+- Regular dependency updates
+- Security scanning in CI/CD
 
 ## Локальный запуск
 

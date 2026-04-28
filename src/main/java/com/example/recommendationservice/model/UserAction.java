@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.elasticsearch.annotations.Document;
 
+import jakarta.validation.constraints.NotBlank;
 import java.io.Serializable;
 
 @Data
@@ -15,10 +16,16 @@ import java.io.Serializable;
 public class UserAction implements Serializable {
 
     @Id
+    @NotBlank(message = "Action ID cannot be blank")
     private String id;
 
+    @NotBlank(message = "User ID cannot be blank")
     private String userId;
+    
+    @NotBlank(message = "Product ID cannot be blank")
     private String productId;
+    
+    @NotBlank(message = "Action type cannot be blank")
     private String actionType;
 
 }
