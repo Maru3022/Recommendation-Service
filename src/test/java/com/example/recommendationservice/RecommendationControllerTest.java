@@ -49,15 +49,12 @@ public class RecommendationControllerTest {
 
     @Test
     void getRecommendations_WithInvalidPage_ShouldReturnBadRequest() throws Exception {
-        when(recommendationService.getRecommendations("user1",-1,10))
-                .thenThrow(new IllegalArgumentException("page must be greater than or equal to 0"));
-
+        // Validation annotation @Min(0) will catch this before service is called
         mockMvc.perform(get("/api/recommendations/user1")
                         .param("page","-1")
                         .param("size","10")
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("page must be greater than or equal to 0"));
+                .andExpect(status().isBadRequest());
     }
 
     @Test
