@@ -377,7 +377,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check staging kubeconfig availability
+        id: precheck
+        shell: bash
+        env:
+          KUBE_CONFIG_STAGING: ${{ secrets.KUBE_CONFIG_STAGING }}
+        run: |
+          if [[ -n "$KUBE_CONFIG_STAGING" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip health check when kubeconfig is missing
+        if: steps.precheck.outputs.configured != 'true'
+        run: echo "KUBE_CONFIG_STAGING is not set. Skipping health check."
+
       - name: Install kubectl
+        if: steps.precheck.outputs.configured == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -387,15 +404,18 @@ jobs:
           sudo mv kubectl /usr/local/bin/kubectl
 
       - name: Configure kubeconfig
+        if: steps.precheck.outputs.configured == 'true'
         shell: bash
         run: |
           mkdir -p "$HOME/.kube"
           echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > "$HOME/.kube/config"
 
       - name: Wait for deployment
+        if: steps.precheck.outputs.configured == 'true'
         run: kubectl rollout status deployment/recommendation-service -n recommendation-staging --timeout=300s
 
       - name: Health check
+        if: steps.precheck.outputs.configured == 'true'
         run: |
           sleep 60
           kubectl wait --for=condition=ready pod -l app=recommendation-service -n recommendation-staging --timeout=300s
