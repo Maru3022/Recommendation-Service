@@ -220,7 +220,6 @@ jobs:
           push: false
           load: true
           tags: recommendation-service:sbom
-          sbom: true
           provenance: false
 
       - name: Build image for pull requests
@@ -232,7 +231,6 @@ jobs:
           tags: recommendation-service:pr-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          sbom: true
 
       - name: Build and push image for main
         if: github.event_name != 'pull_request'
