@@ -1,0 +1,56 @@
+# Replit profile.
+#
+# The production code expects PostgreSQL + Elasticsearch + Redis + Kafka.
+# None of those external services are available inside the Replit container,
+# so this profile:
+#   * uses an embedded H2 in-memory database for JPA;
+#   * disables the Elasticsearch / Redis / Kafka auto-configurations;
+#   * relies on the in-memory beans declared in
+#     `com.example.recommendationservice.replit` (see ReplitMockBeansConfig,
+#     InMemoryProductSearchRepository, InMemoryActionRepository,
+#     InMemoryRedisTemplate, SampleDataLoader).
+#
+# Activate via SPRING_PROFILES_ACTIVE=replit.
+spring:
+  application:
+    name: recommendation-service
+
+  # ---- JPA / Datasource ----
+  datasource:
+    url: jdbc:h2:mem:replitdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+  # ---- Disable infra we don't have in Replit ----
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchRestClientAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchDataAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchRepositoriesAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.elasticsearch.ReactiveElasticsearchRepositoriesAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+
+logging:
+  level:
+    root: INFO
+    com.example.recommendationservice: INFO
+
+server:
+  port: 8026
+
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false

@@ -3,10 +3,12 @@ package com.example.recommendationservice.consumer;
 import com.example.recommendationservice.model.ProductDoc;
 import com.example.recommendationservice.service.ProductSyncService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 
 @Service
+@Profile("!replit")
 @RequiredArgsConstructor
 public class ProductSyncConsumer {
 

@@ -2,11 +2,13 @@ package com.example.recommendationservice.consumer;
 
 import com.example.recommendationservice.model.UserAction;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
+@Profile("!replit")
 public class EventConsumer {
 
     @KafkaListener(
