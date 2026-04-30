@@ -218,7 +218,6 @@ jobs:
         with:
           context: .
           push: false
-          platforms: linux/amd64
           load: true
           tags: recommendation-service:sbom
           sbom: true
@@ -230,7 +229,6 @@ jobs:
         with:
           context: .
           push: false
-          platforms: linux/amd64
           tags: recommendation-service:pr-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
