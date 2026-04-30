@@ -122,15 +122,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install kubectl
-        shell: bash
-        run: |
-          set -euo pipefail
-          KUBECTL_VERSION="$(curl -L -s https://dl.k8s.io/release/stable.txt)"
-          curl -L -o kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
-          chmod +x kubectl
-          sudo mv kubectl /usr/local/bin/kubectl
-          kubectl version --client
+      - name: Setup kustomize
+        uses: imranismail/setup-kustomize@v4
+        with:
+          kustomize-version: '5.3.0'
 
       - name: Install kubeconform
         shell: bash
@@ -146,14 +141,21 @@ jobs:
         shell: bash
         run: |
           mkdir -p rendered
-          kubectl kustomize k8s/overlays/staging > rendered/staging.yaml
+          echo "Using kustomize version: $(kustomize version)"
+          echo "Current directory: $(pwd)"
+          echo "k8s/overlays/staging exists: $(ls -la k8s/overlays/staging)"
+          kustomize build k8s/overlays/staging > rendered/staging.yaml
 
       - name: Validate staging manifests
         run: kubeconform -strict -summary rendered/staging.yaml
 
       - name: Render production manifests
         shell: bash
-        run: kubectl kustomize k8s/overlays/production > rendered/production.yaml
+        run: |
+          echo "Using kustomize version: $(kustomize version)"
+          echo "Current directory: $(pwd)"
+          echo "k8s/overlays/production exists: $(ls -la k8s/overlays/production)"
+          kustomize build k8s/overlays/production > rendered/production.yaml
 
       - name: Validate production manifests
         run: kubeconform -strict -summary rendered/production.yaml
