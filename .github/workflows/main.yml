@@ -45,7 +45,7 @@ jobs:
           cache: maven
 
       - name: Run tests with coverage
-        run: mvn -B -ntp clean test jacoco:report
+        run: mvn -B -ntp clean test jacoco:report verify
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -56,6 +56,7 @@ jobs:
             target/surefire-reports/
             target/failsafe-reports/
             target/site/jacoco/
+            target/site/jacoco/index.html
 
   package-and-verify:
     name: Package & Verify

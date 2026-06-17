@@ -6,24 +6,21 @@ import com.example.recommendationservice.service.RecommendationService;
 import com.example.recommendationservice.service.EnhancedRecommendationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.reactive.server.WebTestClient;
 
 import java.util.List;
 
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 
-@WebMvcTest(RecommendationController.class)
+@WebFluxTest(RecommendationController.class)
 public class RecommendationControllerTest {
 
     @Autowired
-    private MockMvc mockMvc;
+    private WebTestClient webTestClient;
 
     @MockitoBean
     private RecommendationService recommendationService;
@@ -38,33 +35,47 @@ public class RecommendationControllerTest {
         when(recommendationService.getRecommendations("user1",0,10))
                 .thenReturn(mockResponse);
 
-        mockMvc.perform(get("/api/recommendations/user1")
-                .param("page","0")
-                .param("size","10")
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.currentPage").value(0))
-                .andExpect(jsonPath("$.products").isArray());
+        webTestClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/recommendations/user1")
+                        .queryParam("page", "0")
+                        .queryParam("size", "10")
+                        .build())
+                .accept(MediaType.APPLICATION_JSON)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.currentPage").isEqualTo(0)
+                .jsonPath("$.products").isArray();
     }
 
     @Test
-    void getRecommendations_WithInvalidPage_ShouldReturnBadRequest() throws Exception {
+    void getRecommendations_WithInvalidPage_ShouldReturnBadRequest() {
         // Validation annotation @Min(0) will catch this before service is called
-        mockMvc.perform(get("/api/recommendations/user1")
-                        .param("page","-1")
-                        .param("size","10")
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest());
+        webTestClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/recommendations/user1")
+                        .queryParam("page", "-1")
+                        .queryParam("size", "10")
+                        .build())
+                .accept(MediaType.APPLICATION_JSON)
+                .exchange()
+                .expectStatus().isBadRequest();
     }
 
     @Test
-    void getPopular_ShouldReturnOk() throws Exception {
+    void getPopular_ShouldReturnOk() {
         when(recommendationService.getPopularProducts(5)).thenReturn(List.of());
 
-        mockMvc.perform(get("/api/recommendations/popular")
-                        .param("limit","5")
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray());
+        webTestClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/recommendations/popular")
+                        .queryParam("limit", "5")
+                        .build())
+                .accept(MediaType.APPLICATION_JSON)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$").isArray();
     }
 }

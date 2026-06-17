@@ -1,12 +1,103 @@
 spring:
+  main:
+    web-application-type: reactive
   application:
-    name: RECOMMENDATION-SERVICE
+    name: api-gateway
+  cloud:
+    gateway:
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: '*'
+            allowedMethods: '*'
+            allowedHeaders: '*'
+            allowCredentials: true
+      routes:
+        - id: trains-service
+          uri: lb://trains-service
+          predicates:
+            - Path=/api/users/**
+          filters:
+            - StripPrefix=1
+            - name: CircuitBreaker
+              args:
+                name: trainsCircuitBreaker
+                fallbackUri: forward:/fallback
+        - id: training-service
+          uri: lb://training-service
+          predicates:
+            - Path=/api/cabinets/**
+          filters:
+            - StripPrefix=1
+            - name: CircuitBreaker
+              args:
+                name: trainingCircuitBreaker
+                fallbackUri: forward:/fallback
+        - id: training-nutrition
+          uri: lb://training-nutrition
+          predicates:
+            - Path=/api/nutrition/**
+          filters:
+            - StripPrefix=1
+            - name: CircuitBreaker
+              args:
+                name: nutritionCircuitBreaker
+                fallbackUri: forward:/fallback
+        - id: training-notification
+          uri: lb://training-notification
+          predicates:
+            - Path=/api/notifications/**
+          filters:
+            - StripPrefix=1
+            - name: CircuitBreaker
+              args:
+                name: notificationsCircuitBreaker
+                fallbackUri: forward:/fallback
+        - id: recommendation-service
+          uri: lb://recommendation-service
+          predicates:
+            - Path=/api/recommendations/**
+          filters:
+            - StripPrefix=1
+            - name: CircuitBreaker
+              args:
+                name: recommendationCircuitBreaker
+                fallbackUri: forward:/fallback
+        - id: saga-orchestrator
+          uri: lb://saga-orchestrator
+          predicates:
+            - Path=/api/saga/**
+          filters:
+            - StripPrefix=1
+            - name: CircuitBreaker
+              args:
+                name: sagaCircuitBreaker
+                fallbackUri: forward:/fallback
+      default-filters:
+        - name: RequestRateLimiter
+          args:
+            key-resolver: '@remoteAddressKeyResolver'
+            redis-rate-limiter.replenishRate: 10
+            redis-rate-limiter.burstCapacity: 20
+            redis-rate-limiter.requestedTokens: 1
+
+server:
+  port: 8080
 
 eureka:
   client:
-    register-with-eureka: true
+    register-with-eureka: false
     fetch-registry: true
     service-url:
       defaultZone: ${EUREKA_SERVER_URL:http://eureka-server:8761/eureka/}
-  instance:
-    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
