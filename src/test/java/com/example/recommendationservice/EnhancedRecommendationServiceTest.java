@@ -42,10 +42,11 @@ public class EnhancedRecommendationServiceTest {
 
     @BeforeEach
     void setUp() {
+        float[] sampleEmbedding = new float[1536];
         sampleProducts = Arrays.asList(
-            new ProductDoc("1", "Laptop", "Electronics", 999.0, "url1"),
-            new ProductDoc("2", "Book", "Books", 19.0, "url2"),
-            new ProductDoc("3", "Shirt", "Fashion", 49.0, "url3")
+            new ProductDoc("1", "Laptop", "High-performance laptop", "Electronics", 999.0, "url1", sampleEmbedding),
+            new ProductDoc("2", "Book", "Programming book", "Books", 19.0, "url2", sampleEmbedding),
+            new ProductDoc("3", "Shirt", "Cotton shirt", "Fashion", 49.0, "url3", sampleEmbedding)
         );
         
         // Setup RedisTemplate mock to return HashOperations

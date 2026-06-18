@@ -26,6 +26,14 @@ spring:
     consumer:
       group-id: rec-group-dev
 
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      embedding:
+        model: text-embedding-ada-002
+      chat:
+        model: gpt-3.5-turbo
+
 logging:
   level:
     com.example.recommendationservice: DEBUG

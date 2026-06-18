@@ -52,7 +52,8 @@ public class RecommendationServiceTest {
         String favCategory = "Electronics";
         when(valueOperations.get("user:" + userId + ":fav_category")).thenReturn(favCategory);
 
-        List<ProductDoc> products = List.of(new ProductDoc("1","Phone","Electronics",999.0,"url"));
+        float[] sampleEmbedding = new float[1536];
+        List<ProductDoc> products = List.of(new ProductDoc("1","Phone","Smartphone","Electronics",999.0,"url", sampleEmbedding));
         Page<ProductDoc> page = new PageImpl<>(products);
 
         when(productSearchRepository.findByCategory(eq(favCategory), any())).thenReturn(page);
@@ -84,7 +85,8 @@ public class RecommendationServiceTest {
         String userId = "789";
         when(valueOperations.get(anyString())).thenThrow(new RedisConnectionFailureException("Redis down"));
 
-        List<ProductDoc> products = List.of(new ProductDoc("2","Book","Books",19.0,"url"));
+        float[] sampleEmbedding = new float[1536];
+        List<ProductDoc> products = List.of(new ProductDoc("2","Book","Programming book","Books",19.0,"url", sampleEmbedding));
         Page<ProductDoc> page = new PageImpl<>(products);
         when(productSearchRepository.findAll(any(PageRequest.class))).thenReturn(page);
 

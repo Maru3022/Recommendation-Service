@@ -23,7 +23,8 @@ public class ProductSyncConsumerTest {
 
     @Test
     void consumeProductUpdate_ShouldCallService(){
-        ProductDoc productDoc = new ProductDoc("p1","Laptop","Tech",1500.0, "img_url");
+        float[] sampleEmbedding = new float[1536];
+        ProductDoc productDoc = new ProductDoc("p1","Laptop","High-performance laptop","Tech",1500.0, "img_url", sampleEmbedding);
 
         productSyncConsumer.consumeProductUpdate(productDoc);
 

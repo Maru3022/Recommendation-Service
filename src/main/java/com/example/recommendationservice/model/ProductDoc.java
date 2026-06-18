@@ -26,6 +26,9 @@ public class ProductDoc {
     @NotBlank(message = "Product name cannot be blank")
     private String name;
 
+    @Field(type = FieldType.Text)
+    private String description;
+
     @Field(type = FieldType.Keyword)
     @NotBlank(message = "Product category cannot be blank")
     private String category;
@@ -35,4 +38,7 @@ public class ProductDoc {
     private Double price;
 
     private String imageUrl;
+
+    @Field(type = FieldType.Dense_Vector, dims = 1536)
+    private float[] embedding;
 }

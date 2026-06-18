@@ -6,6 +6,8 @@ import com.example.recommendationservice.service.EnhancedRecommendationService;
 import com.example.recommendationservice.service.RecommendationService;
 import com.example.recommendationservice.service.UserActionService;
 import com.example.recommendationservice.service.ProductSyncService;
+import com.example.recommendationservice.service.EmbeddingService;
+import com.example.recommendationservice.service.RagRecommendationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -34,6 +36,12 @@ class RecommendationServiceApplicationTests {
 
     @MockitoBean
     private ProductSyncService productSyncService;
+
+    @MockitoBean
+    private EmbeddingService embeddingService;
+
+    @MockitoBean
+    private RagRecommendationService ragRecommendationService;
 
     @Test
     void contextLoads() {

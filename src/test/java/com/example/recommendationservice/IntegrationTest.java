@@ -47,9 +47,10 @@ public class IntegrationTest {
     @Test
     void testFullRecommendationFlow() {
         // 1. Create test products
-        ProductDoc laptop = new ProductDoc("1", "Laptop", "Electronics", 999.0, "url1");
-        ProductDoc book = new ProductDoc("2", "Book", "Books", 19.0, "url2");
-        ProductDoc shirt = new ProductDoc("3", "Shirt", "Fashion", 49.0, "url3");
+        float[] sampleEmbedding = new float[1536];
+        ProductDoc laptop = new ProductDoc("1", "Laptop", "High-performance laptop", "Electronics", 999.0, "url1", sampleEmbedding);
+        ProductDoc book = new ProductDoc("2", "Book", "Programming book", "Books", 19.0, "url2", sampleEmbedding);
+        ProductDoc shirt = new ProductDoc("3", "Shirt", "Cotton shirt", "Fashion", 49.0, "url3", sampleEmbedding);
 
         productRepository.saveAll(Arrays.asList(laptop, book, shirt));
 
@@ -79,8 +80,9 @@ public class IntegrationTest {
     @Test
     void testProductValidation() {
         // Test creating products with validation
-        ProductDoc validProduct = new ProductDoc("valid-id", "Valid Product", "Electronics", 99.0, "url");
-        ProductDoc invalidProduct = new ProductDoc("", "", "", -1.0, "");
+        float[] sampleEmbedding = new float[1536];
+        ProductDoc validProduct = new ProductDoc("valid-id", "Valid Product", "Valid description", "Electronics", 99.0, "url", sampleEmbedding);
+        ProductDoc invalidProduct = new ProductDoc("", "", "", "", -1.0, "", sampleEmbedding);
 
         // This would be tested in controller layer with validation
         assertNotNull(validProduct.getId());
@@ -102,7 +104,8 @@ public class IntegrationTest {
     @Test
     void testRepositoryOperations() {
         // Test basic repository operations
-        ProductDoc product = new ProductDoc("test", "Test Product", "Test", 10.0, "test-url");
+        float[] sampleEmbedding = new float[1536];
+        ProductDoc product = new ProductDoc("test", "Test Product", "Test description", "Test", 10.0, "test-url", sampleEmbedding);
         productRepository.save(product);
 
         assertTrue(productRepository.existsById("test"));

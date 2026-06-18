@@ -12,11 +12,15 @@ import org.springframework.stereotype.Service;
 public class ProductSyncService {
 
     private final ProductSearchRepository productSearchRepository;
-    public void saveProduct(ProductDoc productDoc){
-        try{
+    private final EmbeddingService embeddingService;
+
+    public void saveProduct(ProductDoc productDoc) {
+        try {
+            embeddingService.generateEmbeddingForProduct(productDoc)
+                    .ifPresent(productDoc::setEmbedding);
             productSearchRepository.save(productDoc);
             log.debug("ElasticSearch: Product {} successfully indexed", productDoc.getId());
-        }catch (Exception e){
+        } catch (Exception e) {
             log.error("ElasticSearch: Failed to index product {}. Error: {}", productDoc.getId(), e.getMessage());
             throw e;
         }
