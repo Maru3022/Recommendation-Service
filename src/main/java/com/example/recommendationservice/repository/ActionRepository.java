@@ -11,4 +11,5 @@ public interface ActionRepository extends ElasticsearchRepository<UserAction, St
     
     List<UserAction> findByUserId(String userId);
     List<UserAction> findByProductId(String productId);
+    List<UserAction> findByProductIdIn(List<String> productIds);
 }

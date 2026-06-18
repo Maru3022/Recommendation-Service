@@ -8,9 +8,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.data.elasticsearch.core.query.StringQuery;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -62,8 +64,7 @@ public class RagRecommendationService {
 
     private List<ProductDoc> performKnnSearch(float[] queryEmbedding, int limit) {
         try {
-            // Temporarily use fallback search until kNN query is properly implemented
-            // This avoids compilation errors with missing Elasticsearch client classes
+            // Temporarily use fallback until kNN is properly implemented
             log.warn("kNN search temporarily using fallback implementation");
             return performFallbackSearch("", limit);
         } catch (Exception e) {
@@ -74,9 +75,23 @@ public class RagRecommendationService {
 
     private List<ProductDoc> performFallbackSearch(String userQuery, int limit) {
         try {
-            // Simple fallback: search by name and description
-            Pageable pageable = PageRequest.of(0, limit);
-            return productSearchRepository.findAll(pageable).getContent();
+            if (userQuery == null || userQuery.trim().isEmpty()) {
+                // Fallback to findAll if query is empty
+                Pageable pageable = PageRequest.of(0, limit);
+                return productSearchRepository.findAll(pageable).getContent();
+            }
+
+            // Multi-match search on name and description
+            String queryString = String.format(
+                    "{\"multi_match\": {\"query\": \"%s\", \"fields\": [\"name\", \"description\"]}}",
+                    userQuery.replace("\"", "\\\""));
+            StringQuery stringQuery = new StringQuery(queryString);
+            stringQuery.setPageable(PageRequest.of(0, limit));
+
+            SearchHits<ProductDoc> searchHits = elasticsearchOperations.search(stringQuery, ProductDoc.class);
+            return searchHits.getSearchHits().stream()
+                    .map(SearchHit::getContent)
+                    .collect(Collectors.toList());
         } catch (Exception e) {
             log.error("Error performing fallback search", e);
             return List.of();

@@ -16,8 +16,12 @@ public class ProductSyncService {
 
     public void saveProduct(ProductDoc productDoc) {
         try {
-            embeddingService.generateEmbeddingForProduct(productDoc)
-                    .ifPresent(productDoc::setEmbedding);
+            float[] embedding = embeddingService.generateEmbeddingForProduct(productDoc)
+                    .orElseThrow(() -> {
+                        log.error("Failed to generate embedding for product: {}", productDoc.getId());
+                        return new RuntimeException("Failed to generate embedding for product: " + productDoc.getId());
+                    });
+            productDoc.setEmbedding(embedding);
             productSearchRepository.save(productDoc);
             log.debug("ElasticSearch: Product {} successfully indexed", productDoc.getId());
         } catch (Exception e) {

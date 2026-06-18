@@ -8,8 +8,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.elasticsearch.client.elc.ElasticsearchAggregations;
+import org.springframework.data.elasticsearch.client.elc.NativeQuery;
+import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import co.elastic.clients.elasticsearch._types.aggregations.Aggregation;
 
 import java.util.*;
 
@@ -21,6 +26,7 @@ public class EnhancedRecommendationService {
     private final ProductSearchRepository productRepository;
     private final ActionRepository actionRepository;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final ElasticsearchOperations elasticsearchOperations;
 
     public List<ProductDoc> getCollaborativeRecommendations(String userId, int limit) {
         log.debug("Getting collaborative recommendations for user: {}", userId);
@@ -117,31 +123,35 @@ public class EnhancedRecommendationService {
         log.debug("Getting trending products");
         
         try {
-            // Simple implementation - get recent user actions and count product frequency
-            // In production, this should use Elasticsearch aggregations
-            List<UserAction> allActions = new ArrayList<>();
-            actionRepository.findAll().forEach(allActions::add);
-            
-            Map<String, Long> productCounts = new HashMap<>();
-            for (UserAction action : allActions) {
-                if ("view".equals(action.getActionType()) || "like".equals(action.getActionType())) {
-                    productCounts.merge(action.getProductId(), 1L, Long::sum);
+            NativeQuery query = NativeQuery.builder()
+                    .withMaxResults(0)
+                    .withAggregation("trending_products", Aggregation.of(a -> a
+                            .terms(t -> t
+                                    .field("productId")
+                                    .size(limit)
+                            )
+                    ))
+                    .build();
+
+            SearchHits<UserAction> searchHits = elasticsearchOperations.search(query, UserAction.class);
+            List<String> trendingIds = new ArrayList<>();
+
+            if (searchHits.getAggregations() != null) {
+                ElasticsearchAggregations aggregations = (ElasticsearchAggregations) searchHits.getAggregations();
+                var aggregate = aggregations.get("trending_products").aggregation().getAggregate();
+
+                if (aggregate.isSterms()) {
+                    aggregate.sterms().buckets().array().forEach(bucket -> {
+                        trendingIds.add(bucket.key().stringValue());
+                    });
                 }
             }
-            
-            List<String> trendingIds = productCounts.entrySet().stream()
-                    .sorted((e1, e2) -> Long.compare(e2.getValue(), e1.getValue()))
-                    .limit(limit)
-                    .map(Map.Entry::getKey)
-                    .collect(java.util.stream.Collectors.toList());
 
             if (trendingIds.isEmpty()) {
                 return Collections.emptyList();
             }
 
-            return productRepository.findAllByIdIn(trendingIds).stream()
-                    .limit(limit)
-                    .collect(java.util.stream.Collectors.toList());
+            return productRepository.findAllByIdIn(trendingIds);
 
         } catch (Exception e) {
             log.error("Error getting trending products", e);
@@ -160,13 +170,10 @@ public class EnhancedRecommendationService {
 
             // Find other users who interacted with same products
             Map<String, Long> userInteractions = new HashMap<>();
-            for (String productId : userProducts) {
-                // This is a simplified approach - in production use Elasticsearch aggregations
-                List<UserAction> actions = actionRepository.findByProductId(productId);
-                for (UserAction action : actions) {
-                    if (!action.getUserId().equals(userId)) {
-                        userInteractions.merge(action.getUserId(), 1L, Long::sum);
-                    }
+            List<UserAction> actions = actionRepository.findByProductIdIn(new ArrayList<>(userProducts));
+            for (UserAction action : actions) {
+                if (!action.getUserId().equals(userId)) {
+                    userInteractions.merge(action.getUserId(), 1L, Long::sum);
                 }
             }
 

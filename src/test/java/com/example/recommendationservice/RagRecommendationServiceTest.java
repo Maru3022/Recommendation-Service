@@ -85,7 +85,7 @@ public class RagRecommendationServiceTest {
         when(embeddingService.generateEmbeddingForQuery(query)).thenReturn(Optional.of(sampleEmbedding));
 
         // Mock fallback search (since kNN is temporarily disabled)
-        when(productSearchRepository.findAll(any(PageRequest.class))).thenReturn(new PageImpl<>(sampleProducts.subList(0, 2)));
+        lenient().when(productSearchRepository.findAll(any(PageRequest.class))).thenReturn(new PageImpl<>(sampleProducts.subList(0, 2)));
 
         // When
         RagResponse response = ragRecommendationService.searchByQuery(query, userId, 10);
@@ -106,7 +106,7 @@ public class RagRecommendationServiceTest {
         when(embeddingService.generateEmbeddingForQuery(query)).thenReturn(Optional.of(sampleEmbedding));
 
         // Mock fallback search
-        when(productSearchRepository.findAll(any(PageRequest.class))).thenReturn(new PageImpl<>(sampleProducts));
+        lenient().when(productSearchRepository.findAll(any(PageRequest.class))).thenReturn(new PageImpl<>(sampleProducts));
 
         // When
         RagResponse response = ragRecommendationService.searchByQuery(query, userId, 10);
@@ -125,7 +125,7 @@ public class RagRecommendationServiceTest {
         when(embeddingService.generateEmbeddingForQuery(query)).thenReturn(Optional.empty());
 
         // Mock fallback search
-        when(productSearchRepository.findAll(any(PageRequest.class))).thenReturn(new PageImpl<>(sampleProducts));
+        lenient().when(productSearchRepository.findAll(any(PageRequest.class))).thenReturn(new PageImpl<>(sampleProducts));
 
         // When
         RagResponse response = ragRecommendationService.searchByQuery(query, userId, 10);

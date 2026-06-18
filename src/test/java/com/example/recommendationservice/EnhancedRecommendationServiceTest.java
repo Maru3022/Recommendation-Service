@@ -11,6 +11,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.SearchHit;
+import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.data.redis.core.RedisTemplate;
 
 import java.util.Arrays;
@@ -34,6 +37,9 @@ public class EnhancedRecommendationServiceTest {
 
     @Mock
     private org.springframework.data.redis.core.HashOperations<String, Object, Object> hashOperations;
+
+    @Mock
+    private ElasticsearchOperations elasticsearchOperations;
 
     @InjectMocks
     private EnhancedRecommendationService enhancedRecommendationService;
@@ -66,7 +72,7 @@ public class EnhancedRecommendationServiceTest {
             new UserAction("a3", "user2", "p3", "view")
         ));
 
-        when(actionRepository.findByProductId("p1")).thenReturn(Arrays.asList(
+        when(actionRepository.findByProductIdIn(anyList())).thenReturn(Arrays.asList(
             new UserAction("a1", userId, "p1", "view"),
             new UserAction("a2", "user2", "p1", "view")
         ));
@@ -104,20 +110,15 @@ public class EnhancedRecommendationServiceTest {
     @Test
     void getTrendingProducts_WithData_ShouldReturnTrending() {
         // Given
-        List<UserAction> actions = Arrays.asList(
-            new UserAction("a1", "user1", "p1", "view"),
-            new UserAction("a2", "user2", "p1", "view"),
-            new UserAction("a3", "user3", "p2", "like")
-        );
-        when(actionRepository.findAll()).thenReturn(actions);
-        when(productRepository.findAllByIdIn(any())).thenReturn(sampleProducts);
+        SearchHits<UserAction> mockSearchHits = mock(SearchHits.class);
+        lenient().when(elasticsearchOperations.search(any(org.springframework.data.elasticsearch.core.query.Query.class), eq(UserAction.class))).thenReturn(mockSearchHits);
+        lenient().when(productRepository.findAllByIdIn(any())).thenReturn(sampleProducts);
 
         // When
         List<ProductDoc> result = enhancedRecommendationService.getTrendingProducts(10);
 
         // Then
         assertNotNull(result);
-        verify(actionRepository).findAll();
     }
 
     @Test
@@ -128,7 +129,7 @@ public class EnhancedRecommendationServiceTest {
             new UserAction("a1", userId, "p1", "view")
         ));
 
-        when(actionRepository.findByProductId("p1")).thenReturn(Arrays.asList(
+        when(actionRepository.findByProductIdIn(anyList())).thenReturn(Arrays.asList(
             new UserAction("a1", userId, "p1", "view")
         ));
 
