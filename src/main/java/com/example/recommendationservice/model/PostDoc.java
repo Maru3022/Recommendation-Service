@@ -1,7 +1,5 @@
 package com.example.recommendationservice.model;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
@@ -12,11 +10,9 @@ import org.springframework.data.elasticsearch.annotations.FieldType;
 import java.time.Instant;
 import java.util.List;
 
-@Document(indexName = "posts")
 @Data
-@Builder
-@AllArgsConstructor
 @NoArgsConstructor
+@Document(indexName = "posts")
 public class PostDoc {
 
     @Id
@@ -24,29 +20,36 @@ public class PostDoc {
 
     @Field(type = FieldType.Keyword)
     private String authorId;
-    private String authorDisplayName;
-    private String authorAvatarUrl;
 
     @Field(type = FieldType.Text)
     private String text;
-    private List<String> mediaUrls;
+
     @Field(type = FieldType.Keyword)
     private String postType;
-    private List<String> tags;
+
     @Field(type = FieldType.Keyword)
     private String category;
 
-    private String relatedTrainingId;
-    private Double durationMinutes;
-    private Double caloriesBurned;
+    @Field(type = FieldType.Keyword)
+    private List<String> tags;
 
+    @Field(type = FieldType.Long)
     private long likesCount;
+
+    @Field(type = FieldType.Long)
     private long commentsCount;
+
+    @Field(type = FieldType.Long)
+    private long sharesCount;
+
+    @Field(type = FieldType.Long)
+    private long savesCount;
+
+    @Field(type = FieldType.Long)
     private long viewsCount;
 
+    @Field(type = FieldType.Date)
     private Instant createdAt;
-    @Field(type = FieldType.Keyword)
-    private String visibility;
 
     @Field(type = FieldType.Dense_Vector, dims = 1536)
     private float[] embedding;

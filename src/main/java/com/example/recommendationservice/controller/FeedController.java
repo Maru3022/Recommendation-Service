@@ -1,123 +1,103 @@
 package com.example.recommendationservice.controller;
 
-import com.example.recommendationservice.model.FeedResponse;
-import com.example.recommendationservice.model.PostDoc;
-import com.example.recommendationservice.service.FeedRankingService;
+import com.example.recommendationservice.dto.FeedRequest;
+import com.example.recommendationservice.dto.FeedResponse;
+import com.example.recommendationservice.dto.PostActionEvent;
+import com.example.recommendationservice.model.PostAction;
+import com.example.recommendationservice.repository.PostSearchRepository;
+import com.example.recommendationservice.service.ContentBasedService;
+import com.example.recommendationservice.service.FeedService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 @RestController
-@RequestMapping("/api/feed")
-@Validated
+@RequestMapping("/api/v1/feed")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:8080"})
-@Tag(name = "Feed API", description = "Personalized fitness post feed with hybrid ranking")
+@Validated
+@Tag(name = "Feed", description = "Recommendation feed endpoints")
 public class FeedController {
 
-    private final FeedRankingService feedRankingService;
+    private final FeedService feedService;
+    private final ContentBasedService contentBasedService;
+    private final PostSearchRepository postSearchRepository;
 
-    // -------------------------------------------------------------------------
-    // Main personalised feed
-    // -------------------------------------------------------------------------
+    @GetMapping
+    @Operation(summary = "Get personalized recommendation feed")
+    public ResponseEntity<FeedResponse> getFeed(
+            @RequestParam @NotBlank String userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) Set<String> excludePostIds
+    ) {
+        FeedRequest request = new FeedRequest();
+        request.setUserId(userId);
+        request.setPage(page);
+        request.setSize(size);
+        request.setExcludePostIds(excludePostIds != null ? excludePostIds : Collections.emptySet());
 
-    @Operation(
-            summary = "Get personalized hybrid feed",
-            description = "Returns a hybrid-ranked feed mixing social, collaborative, content-based, trending, and freshness signals")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Feed returned"),
-            @ApiResponse(responseCode = "400", description = "Invalid parameters")
-    })
-    @GetMapping("/{userId}")
-    public ResponseEntity<FeedResponse> getPersonalizedFeed(
-            @PathVariable @NotBlank @Size(max = 50) String userId,
-            @RequestParam(defaultValue = "0")  @Min(0)           int page,
-            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size) {
-
-        log.info("Personalized feed request | user={} page={} size={}", userId, page, size);
-        long t0 = System.currentTimeMillis();
-        FeedResponse response = feedRankingService.getPersonalizedFeed(userId, page, size);
-        log.info("Personalized feed | user={} posts={} durationMs={}",
-                userId, response.getPosts().size(), System.currentTimeMillis() - t0);
+        FeedResponse response = feedService.getFeed(request);
         return ResponseEntity.ok(response);
     }
 
-    // -------------------------------------------------------------------------
-    // Following-only chronological feed
-    // -------------------------------------------------------------------------
-
-    @Operation(
-            summary = "Get chronological following feed",
-            description = "Returns posts from followed users, sorted by creation date, newest first")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Feed returned")
-    })
-    @GetMapping("/{userId}/following")
-    public ResponseEntity<FeedResponse> getFollowingFeed(
-            @PathVariable @NotBlank @Size(max = 50) String userId,
-            @RequestParam(defaultValue = "0")  @Min(0)           int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-
-        log.info("Following feed request | user={} page={} size={}", userId, page, size);
-        return ResponseEntity.ok(feedRankingService.getFollowingFeed(userId, page, size));
+    @PostMapping("/action")
+    @Operation(summary = "Record user action on a post")
+    public ResponseEntity<Void> recordAction(@RequestBody @Valid PostActionEvent event) {
+        if (event.getTimestamp() == null) {
+            event.setTimestamp(Instant.now());
+        }
+        feedService.invalidateCache(event.getUserId());
+        return ResponseEntity.accepted().build();
     }
 
-    // -------------------------------------------------------------------------
-    // Global trending
-    // -------------------------------------------------------------------------
+    @GetMapping("/search")
+    @Operation(summary = "Semantic search for posts")
+    public ResponseEntity<FeedResponse> semanticSearch(
+            @RequestParam @NotBlank String userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        List<com.example.recommendationservice.dto.PostSummaryDto> posts =
+                contentBasedService.getContentBasedPosts(userId, size, Collections.emptySet())
+                        .stream()
+                        .map(p -> com.example.recommendationservice.dto.PostSummaryDto.builder()
+                                .postId(p.getId())
+                                .authorId(p.getAuthorId())
+                                .text(p.getText())
+                                .postType(p.getPostType())
+                                .category(p.getCategory())
+                                .tags(p.getTags())
+                                .likesCount(p.getLikesCount())
+                                .commentsCount(p.getCommentsCount())
+                                .createdAt(p.getCreatedAt())
+                                .build())
+                        .toList();
 
-    @Operation(
-            summary = "Get global trending posts",
-            description = "Returns top posts by interaction count in the last 72 hours")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Trending posts returned")
-    })
-    @GetMapping("/trending")
-    public ResponseEntity<List<PostDoc>> getTrendingPosts(
-            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int limit) {
-
-        log.info("Trending posts request | limit={}", limit);
-        return ResponseEntity.ok(feedRankingService.getTrendingPosts(limit));
+        FeedResponse response = FeedResponse.builder()
+                .posts(posts)
+                .page(page)
+                .size(posts.size())
+                .hasMore(false)
+                .build();
+        return ResponseEntity.ok(response);
     }
 
-    // -------------------------------------------------------------------------
-    // Debug / comparison endpoints
-    // -------------------------------------------------------------------------
-
-    @Operation(
-            summary = "Collaborative-only recommendations (debug)",
-            description = "Raw collaborative-filtering signal — useful for A/B comparison")
-    @ApiResponse(responseCode = "200", description = "Posts returned")
-    @GetMapping("/{userId}/collaborative")
-    public ResponseEntity<List<PostDoc>> getCollaborative(
-            @PathVariable @NotBlank @Size(max = 50) String userId,
-            @RequestParam(defaultValue = "10") @Min(1) @Max(50) int limit) {
-
-        return ResponseEntity.ok(feedRankingService.getCollaborativeRecommendations(userId, limit));
-    }
-
-    @Operation(
-            summary = "Content-based recommendations (debug)",
-            description = "Raw content-based signal based on the user's category preferences")
-    @ApiResponse(responseCode = "200", description = "Posts returned")
-    @GetMapping("/{userId}/content-based")
-    public ResponseEntity<List<PostDoc>> getContentBased(
-            @PathVariable @NotBlank @Size(max = 50) String userId,
-            @RequestParam(defaultValue = "10") @Min(1) @Max(50) int limit) {
-
-        return ResponseEntity.ok(feedRankingService.getContentBasedRecommendations(userId, limit));
+    @PostMapping("/invalidate")
+    @Operation(summary = "Invalidate feed cache for user")
+    public ResponseEntity<Void> invalidateCache(@RequestParam @NotBlank String userId) {
+        feedService.invalidateCache(userId);
+        return ResponseEntity.noContent().build();
     }
 }

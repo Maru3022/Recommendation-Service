@@ -1,34 +1,51 @@
 package com.example.recommendationservice.model;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
+import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.elasticsearch.annotations.Document;
-import org.springframework.data.elasticsearch.annotations.Field;
-import org.springframework.data.elasticsearch.annotations.FieldType;
 
 import java.time.Instant;
 
-@Document(indexName = "post_actions")
 @Data
-@Builder
-@AllArgsConstructor
 @NoArgsConstructor
+@Entity
+@Table(name = "post_actions",
+        indexes = {
+                @Index(name = "idx_action_user_post", columnList = "userId, postId"),
+                @Index(name = "idx_action_post", columnList = "postId")
+        })
 public class PostAction {
 
     @Id
-    private String id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    @Field(type = FieldType.Keyword)
+    @Column(nullable = false)
     private String userId;
 
-    @Field(type = FieldType.Keyword)
+    @Column(nullable = false)
     private String postId;
 
-    @Field(type = FieldType.Keyword)
-    private String actionType;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ActionType actionType;
+
+    private double weight;
 
     private Instant createdAt;
+
+    public enum ActionType {
+        LIKE, COMMENT, SAVE, VIEW, SHARE, SKIP;
+
+        public double defaultWeight() {
+            return switch (this) {
+                case LIKE -> 1.0;
+                case COMMENT -> 1.2;
+                case SAVE -> 1.5;
+                case SHARE -> 1.3;
+                case VIEW -> 0.1;
+                case SKIP -> -0.3;
+            };
+        }
+    }
 }

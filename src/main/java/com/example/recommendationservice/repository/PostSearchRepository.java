@@ -11,7 +11,11 @@ import java.util.List;
 @Repository
 public interface PostSearchRepository extends ElasticsearchRepository<PostDoc, String> {
 
-    Page<PostDoc> findByCategory(String category, Pageable pageable);
+    List<PostDoc> findByAuthorIdIn(List<String> authorIds, Pageable pageable);
 
-    List<PostDoc> findAllByIdIn(List<String> ids);
+    Page<PostDoc> findByCategoryOrderByLikesCountDesc(String category, Pageable pageable);
+
+    List<PostDoc> findByTagsIn(List<String> tags, Pageable pageable);
+
+    List<PostDoc> findByIdIn(List<String> ids);
 }

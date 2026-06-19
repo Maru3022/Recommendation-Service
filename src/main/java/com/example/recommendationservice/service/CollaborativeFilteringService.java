@@ -1,0 +1,152 @@
+package com.example.recommendationservice.service;
+
+import com.example.recommendationservice.config.FeedProperties;
+import com.example.recommendationservice.model.PostDoc;
+import com.example.recommendationservice.model.UserProfile;
+import com.example.recommendationservice.repository.PostSearchRepository;
+import com.example.recommendationservice.repository.UserProfileRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class CollaborativeFilteringService {
+
+    private static final String SIMILAR_USERS_KEY = "similar_users:";
+    private static final int SIMILAR_USERS_TTL_HOURS = 6;
+    private static final int PROFILE_BATCH_SIZE = 500;
+
+    private final UserProfileRepository userProfileRepository;
+    private final UserProfileService userProfileService;
+    private final PostSearchRepository postSearchRepository;
+    private final RedisTemplate<String, Object> redisTemplate;
+    private final ObjectMapper objectMapper;
+    private final FeedProperties feedProperties;
+
+    public List<PostDoc> getCollaborativePosts(String userId, int limit, Set<String> excludeIds) {
+        UserProfile currentUser = userProfileRepository.findById(userId).orElse(null);
+        if (currentUser == null) return Collections.emptyList();
+
+        Set<String> viewedByUser = currentUser.getViewedPostIds();
+
+        List<String> similarUserIds = getSimilarUsersFromCache(userId);
+        if (similarUserIds == null) {
+            similarUserIds = computeSimilarUsers(userId);
+            cacheSimilarUsers(userId, similarUserIds);
+        }
+
+        if (similarUserIds.isEmpty()) return Collections.emptyList();
+
+        Set<String> likedPostIds = new LinkedHashSet<>();
+        for (String similarUserId : similarUserIds) {
+            userProfileRepository.findById(similarUserId).ifPresent(profile ->
+                    profile.getLikedPostIds().stream()
+                            .filter(id -> !excludeIds.contains(id))
+                            .filter(id -> !viewedByUser.contains(id))
+                            .forEach(likedPostIds::add)
+            );
+        }
+
+        if (likedPostIds.isEmpty()) return Collections.emptyList();
+
+        return postSearchRepository.findByIdIn(new ArrayList<>(likedPostIds))
+                .stream()
+                .limit(limit)
+                .toList();
+    }
+
+    @Scheduled(fixedDelay = 21_600_000)
+    public void refreshAllSimilarUsers() {
+        log.info("Refreshing similar users cache...");
+        int page = 0;
+        List<UserProfile> batch;
+        do {
+            batch = userProfileRepository.findAll(PageRequest.of(page++, PROFILE_BATCH_SIZE)).getContent();
+            batch.stream()
+                    .filter(p -> p.getInterestEmbeddingJson() != null)
+                    .forEach(p -> {
+                        List<String> similar = computeSimilarUsers(p.getUserId());
+                        cacheSimilarUsers(p.getUserId(), similar);
+                    });
+        } while (batch.size() == PROFILE_BATCH_SIZE);
+        log.info("Similar users cache refreshed");
+    }
+
+    private List<String> computeSimilarUsers(String userId) {
+        float[] userEmbedding = userProfileService.getInterestEmbedding(userId).orElse(null);
+        if (userEmbedding == null) return Collections.emptyList();
+
+        int page = 0;
+        List<UserProfile> batch;
+        List<Map.Entry<String, Double>> similarities = new ArrayList<>();
+
+        do {
+            batch = userProfileRepository.findAll(PageRequest.of(page++, PROFILE_BATCH_SIZE)).getContent();
+            batch.stream()
+                    .filter(p -> !p.getUserId().equals(userId))
+                    .filter(p -> p.getInterestEmbeddingJson() != null)
+                    .forEach(p -> {
+                        float[] emb = userProfileService.getInterestEmbedding(p.getUserId()).orElse(null);
+                        if (emb != null) {
+                            double sim = cosineSimilarity(userEmbedding, emb);
+                            if (sim > 0.5) {
+                                similarities.add(Map.entry(p.getUserId(), sim));
+                            }
+                        }
+                    });
+        } while (batch.size() == PROFILE_BATCH_SIZE);
+
+        return similarities.stream()
+                .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
+                .limit(feedProperties.getSimilarUsersLimit())
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> getSimilarUsersFromCache(String userId) {
+        try {
+            Object raw = redisTemplate.opsForValue().get(SIMILAR_USERS_KEY + userId);
+            if (raw == null) return null;
+            String json = raw instanceof String s ? s : objectMapper.writeValueAsString(raw);
+            return objectMapper.readValue(json, new TypeReference<List<String>>() {});
+        } catch (Exception e) {
+            log.warn("Failed to read similar users cache for {}: {}", userId, e.getMessage());
+            return null;
+        }
+    }
+
+    private void cacheSimilarUsers(String userId, List<String> similarUserIds) {
+        try {
+            String json = objectMapper.writeValueAsString(similarUserIds);
+            redisTemplate.opsForValue().set(
+                    SIMILAR_USERS_KEY + userId, json, SIMILAR_USERS_TTL_HOURS, TimeUnit.HOURS
+            );
+        } catch (Exception e) {
+            log.warn("Failed to cache similar users for {}: {}", userId, e.getMessage());
+        }
+    }
+
+    private double cosineSimilarity(float[] a, float[] b) {
+        if (a.length != b.length) return 0.0;
+        double dot = 0, normA = 0, normB = 0;
+        for (int i = 0; i < a.length; i++) {
+            dot += a[i] * b[i];
+            normA += a[i] * a[i];
+            normB += b[i] * b[i];
+        }
+        if (normA == 0 || normB == 0) return 0.0;
+        return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+    }
+}
