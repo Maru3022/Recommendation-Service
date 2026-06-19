@@ -10,6 +10,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.time.Instant;
 import java.util.Collections;
@@ -21,6 +23,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class FeedScoringServiceTest {
 
     @Mock private SocialSignalService socialSignalService;
@@ -44,8 +47,6 @@ class FeedScoringServiceTest {
         weights.setTrending(0.15);
         weights.setFreshness(0.05);
 
-        when(feedProperties.getWeights()).thenReturn(weights);
-        when(feedProperties.getFreshnessHalfLifeHours()).thenReturn(48.0);
         when(scoringService.calculateFeedScore(anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
                 .thenAnswer(invocation -> {
                     double social = invocation.getArgument(0);

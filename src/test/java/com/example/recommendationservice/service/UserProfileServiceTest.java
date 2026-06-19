@@ -4,6 +4,7 @@ import com.example.recommendationservice.model.UserProfile;
 import com.example.recommendationservice.repository.UserProfileRepository;
 import com.example.recommendationservice.repository.UserProfileSearchRepository;
 import com.example.recommendationservice.model.UserProfileDoc;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,8 +14,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -32,6 +35,7 @@ class UserProfileServiceTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(userProfileService, "alphaPercent", 30);
+        ReflectionTestUtils.setField(userProfileService, "objectMapper", new ObjectMapper());
     }
 
     @Test
@@ -96,7 +100,7 @@ class UserProfileServiceTest {
     void recordLike_addsPostToLikedPosts() {
         UserProfile profile = new UserProfile();
         profile.setUserId("user1");
-        profile.setLikedPostIds(Set.of());
+        profile.setLikedPostIds(new HashSet<>());
         when(userProfileRepository.findById("user1")).thenReturn(Optional.of(profile));
         when(userProfileRepository.save(any(UserProfile.class))).thenReturn(profile);
 
@@ -110,7 +114,7 @@ class UserProfileServiceTest {
     void recordSave_addsPostToSavedPosts() {
         UserProfile profile = new UserProfile();
         profile.setUserId("user1");
-        profile.setSavedPostIds(Set.of());
+        profile.setSavedPostIds(new HashSet<>());
         when(userProfileRepository.findById("user1")).thenReturn(Optional.of(profile));
         when(userProfileRepository.save(any(UserProfile.class))).thenReturn(profile);
 
@@ -124,7 +128,7 @@ class UserProfileServiceTest {
     void recordView_addsPostToViewedPosts() {
         UserProfile profile = new UserProfile();
         profile.setUserId("user1");
-        profile.setViewedPostIds(List.of());
+        profile.setViewedPostIds(new ArrayList<>());
         when(userProfileRepository.findById("user1")).thenReturn(Optional.of(profile));
         when(userProfileRepository.save(any(UserProfile.class))).thenReturn(profile);
 

@@ -1,5 +1,6 @@
 package com.example.recommendationservice.service;
 
+import com.example.recommendationservice.model.CreatePostRequest;
 import com.example.recommendationservice.model.PostDoc;
 import com.example.recommendationservice.repository.PostSearchRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +28,7 @@ class PostServiceTest {
     private PostService postService;
 
     private PostDoc testPost;
+    private CreatePostRequest createRequest;
 
     @BeforeEach
     void setUp() {
@@ -35,55 +37,67 @@ class PostServiceTest {
         testPost.setAuthorId("author1");
         testPost.setText("Test post");
         testPost.setCreatedAt(Instant.now());
+
+        createRequest = CreatePostRequest.builder()
+                .authorId("author1")
+                .authorDisplayName("Author One")
+                .text("Test post")
+                .postType("POST")
+                .category("FITNESS")
+                .tags(List.of("tag1"))
+                .visibility("PUBLIC")
+                .build();
     }
 
     @Test
     void createPost_savesPostWithEmbedding() {
-        when(embeddingService.generateEmbedding("Test post")).thenReturn(new float[1536]);
+        when(embeddingService.generateEmbeddingForPost(any(PostDoc.class)))
+                .thenReturn(Optional.of(new float[1536]));
         when(postSearchRepository.save(any(PostDoc.class))).thenReturn(testPost);
 
-        PostDoc result = postService.createPost("author1", "Test post", "POST", "FITNESS", List.of("tag1"));
+        PostDoc result = postService.createPost(createRequest);
 
         assertThat(result.getAuthorId()).isEqualTo("author1");
         verify(postSearchRepository).save(any(PostDoc.class));
-        verify(embeddingService).generateEmbedding("Test post");
+        verify(embeddingService).generateEmbeddingForPost(any(PostDoc.class));
     }
 
     @Test
-    void getPostById_returnsPost() {
+    void getPost_returnsPost() {
         when(postSearchRepository.findById("post1")).thenReturn(Optional.of(testPost));
 
-        Optional<PostDoc> result = postService.getPostById("post1");
+        Optional<PostDoc> result = postService.getPost("post1");
 
         assertThat(result).isPresent();
         assertThat(result.get().getId()).isEqualTo("post1");
     }
 
     @Test
-    void getPostById_returnsEmptyWhenNotFound() {
+    void getPost_returnsEmptyWhenNotFound() {
         when(postSearchRepository.findById("post1")).thenReturn(Optional.empty());
 
-        Optional<PostDoc> result = postService.getPostById("post1");
+        Optional<PostDoc> result = postService.getPost("post1");
 
         assertThat(result).isEmpty();
     }
 
     @Test
-    void getPostsByAuthor_returnsPosts() {
-        when(postSearchRepository.findByAuthorId("author1")).thenReturn(List.of(testPost));
+    void deletePost_deletesWhenAuthorMatches() {
+        when(postSearchRepository.findById("post1")).thenReturn(Optional.of(testPost));
 
-        List<PostDoc> result = postService.getPostsByAuthor("author1");
+        boolean deleted = postService.deletePost("post1", "author1");
 
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).getAuthorId()).isEqualTo("author1");
+        assertThat(deleted).isTrue();
+        verify(postSearchRepository).deleteById("post1");
     }
 
     @Test
-    void deletePost_deletesPost() {
-        doNothing().when(postSearchRepository).deleteById("post1");
+    void deletePost_returnsFalseWhenNotAuthor() {
+        when(postSearchRepository.findById("post1")).thenReturn(Optional.of(testPost));
 
-        postService.deletePost("post1");
+        boolean deleted = postService.deletePost("post1", "other-user");
 
-        verify(postSearchRepository).deleteById("post1");
+        assertThat(deleted).isFalse();
+        verify(postSearchRepository, never()).deleteById(any());
     }
 }

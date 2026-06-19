@@ -1,27 +1,35 @@
 package com.example.recommendationservice.service;
 
 import com.example.recommendationservice.model.PostAction;
+import com.example.recommendationservice.model.PostDoc;
 import com.example.recommendationservice.repository.PostActionRepository;
+import com.example.recommendationservice.repository.PostSearchRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.HashOperations;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class PostActionServiceTest {
 
     @Mock private PostActionRepository postActionRepository;
-    @Mock private UserProfileService userProfileService;
+    @Mock private PostSearchRepository postSearchRepository;
+    @Mock private RedisTemplate<String, Object> redisTemplate;
+    @Mock private HashOperations<String, Object, Object> hashOperations;
+    @Mock private ValueOperations<String, Object> valueOperations;
 
     @InjectMocks
     private PostActionService postActionService;
@@ -30,12 +38,13 @@ class PostActionServiceTest {
 
     @BeforeEach
     void setUp() {
-        postAction = new PostAction();
-        postAction.setId("action1");
-        postAction.setUserId("user1");
-        postAction.setPostId("post1");
-        postAction.setActionType("LIKE");
-        postAction.setCreatedAt(Instant.now());
+        postAction = PostAction.builder()
+                .id(1L)
+                .userId("user1")
+                .postId("post1")
+                .actionType(PostAction.ActionType.LIKE)
+                .createdAt(Instant.now())
+                .build();
     }
 
     @Test
@@ -45,35 +54,28 @@ class PostActionServiceTest {
         PostAction result = postActionService.trackAction("user1", "post1", "LIKE");
 
         assertThat(result.getUserId()).isEqualTo("user1");
-        assertThat(result.getActionType()).isEqualTo("LIKE");
+        assertThat(result.getActionType()).isEqualTo(PostAction.ActionType.LIKE);
         verify(postActionRepository).save(any(PostAction.class));
     }
 
     @Test
-    void trackAction_updatesUserProfileForLike() {
-        when(postActionRepository.save(any(PostAction.class))).thenReturn(postAction);
+    void trackAction_likeUpdatesCategoryPreferences() {
+        when(redisTemplate.opsForHash()).thenReturn(hashOperations);
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        PostDoc post = new PostDoc();
+        post.setId("post1");
+        post.setCategory("FITNESS");
+        post.setTags(List.of("workout"));
+        post.setEmbedding(new float[1536]);
+
+        when(postSearchRepository.findById("post1")).thenReturn(Optional.of(post));
+        when(postActionRepository.save(any(PostAction.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         postActionService.trackAction("user1", "post1", "LIKE");
 
-        verify(userProfileService).recordLike("user1", "post1");
-    }
-
-    @Test
-    void trackAction_updatesUserProfileForSave() {
-        when(postActionRepository.save(any(PostAction.class))).thenReturn(postAction);
-
-        postActionService.trackAction("user1", "post1", "SAVE");
-
-        verify(userProfileService).recordSave("user1", "post1");
-    }
-
-    @Test
-    void trackAction_updatesUserProfileForView() {
-        when(postActionRepository.save(any(PostAction.class))).thenReturn(postAction);
-
-        postActionService.trackAction("user1", "post1", "VIEW");
-
-        verify(userProfileService).recordView("user1", "post1");
+        verify(hashOperations).increment("user:user1:category_preferences", "FITNESS", 3L);
+        verify(valueOperations).set(eq("user:user1:interest_embedding"), any(float[].class));
     }
 
     @Test
@@ -87,10 +89,10 @@ class PostActionServiceTest {
     }
 
     @Test
-    void getActionsByUserId_returnsActions() {
+    void getUserActionHistory_returnsActions() {
         when(postActionRepository.findByUserId("user1")).thenReturn(List.of(postAction));
 
-        List<PostAction> result = postActionService.getActionsByUserId("user1");
+        List<PostAction> result = postActionService.getUserActionHistory("user1");
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getUserId()).isEqualTo("user1");
@@ -98,11 +100,11 @@ class PostActionServiceTest {
 
     @Test
     void getActionById_returnsAction() {
-        when(postActionRepository.findById("action1")).thenReturn(Optional.of(postAction));
+        when(postActionRepository.findById(1L)).thenReturn(Optional.of(postAction));
 
-        Optional<PostAction> result = postActionService.getActionById("action1");
+        Optional<PostAction> result = postActionService.getActionById("1");
 
         assertThat(result).isPresent();
-        assertThat(result.get().getId()).isEqualTo("action1");
+        assertThat(result.get().getId()).isEqualTo(1L);
     }
 }

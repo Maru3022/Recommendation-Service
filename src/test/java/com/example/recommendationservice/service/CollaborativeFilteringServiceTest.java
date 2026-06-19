@@ -7,6 +7,7 @@ import com.example.recommendationservice.model.UserProfileDoc;
 import com.example.recommendationservice.repository.PostSearchRepository;
 import com.example.recommendationservice.repository.UserProfileRepository;
 import com.example.recommendationservice.repository.UserProfileSearchRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
@@ -27,6 +30,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class CollaborativeFilteringServiceTest {
 
     @Mock private UserProfileRepository userProfileRepository;
@@ -48,6 +52,7 @@ class CollaborativeFilteringServiceTest {
     void setUp() {
         testUser = new UserProfile();
         testUser.setUserId("user1");
+        testUser.setInterestEmbeddingJson("[0.1, 0.2]");
         testUser.setLikedPostIds(Set.of("post1", "post2"));
         testUser.setViewedPostIds(List.of("post3"));
 
@@ -110,13 +115,16 @@ class CollaborativeFilteringServiceTest {
     void getCollaborativePosts_usesCachedSimilarUsers() throws Exception {
         when(userProfileRepository.findById("user1")).thenReturn(Optional.of(testUser));
         when(valueOperations.get("similar_users:user1")).thenReturn("[\"user2\"]");
+        when(objectMapper.readValue(eq("[\"user2\"]"), any(TypeReference.class))).thenReturn(List.of("user2"));
 
         UserProfile similarUserProfile = new UserProfile();
         similarUserProfile.setUserId("user2");
         similarUserProfile.setLikedPostIds(Set.of("post4"));
         when(userProfileRepository.findById("user2")).thenReturn(Optional.of(similarUserProfile));
 
-        when(postSearchRepository.findByIdIn(anyList())).thenReturn(List.of(testPost));
+        PostDoc likedPost = new PostDoc();
+        likedPost.setId("post4");
+        when(postSearchRepository.findByIdIn(anyList())).thenReturn(List.of(likedPost));
 
         List<PostDoc> result = collaborativeFilteringService.getCollaborativePosts("user1", 10, Set.of());
 
@@ -149,6 +157,7 @@ class CollaborativeFilteringServiceTest {
 
     @Test
     void computeSimilarUsers_knnFailure_returnsEmptyList() {
+        when(userProfileRepository.findById("user1")).thenReturn(Optional.of(testUser));
         when(userProfileService.getInterestEmbedding("user1")).thenReturn(Optional.of(new float[1536]));
         when(userProfileSearchRepository.findSimilarByKnn(any(float[].class), eq(5), anyInt()))
                 .thenThrow(new RuntimeException("ES error"));

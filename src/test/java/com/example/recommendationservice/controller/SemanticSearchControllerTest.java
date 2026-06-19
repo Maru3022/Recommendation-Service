@@ -1,9 +1,9 @@
 package com.example.recommendationservice.controller;
 
+import com.example.recommendationservice.model.PostDoc;
 import com.example.recommendationservice.model.SearchRequest;
 import com.example.recommendationservice.model.SearchResponse;
 import com.example.recommendationservice.service.SemanticSearchService;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -14,7 +14,6 @@ import org.springframework.http.ResponseEntity;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -27,14 +26,18 @@ class SemanticSearchControllerTest {
 
     @Test
     void search_returnsSearchResults() {
-        SearchRequest request = new SearchRequest();
-        request.setQuery("fitness");
-        request.setLimit(10);
+        SearchRequest request = new SearchRequest("fitness tips", "user1");
+        SearchResponse expected = SearchResponse.builder()
+                .aiExplanation("These posts match your fitness query.")
+                .posts(List.of(new PostDoc()))
+                .build();
 
-        when(semanticSearchService.semanticSearch("fitness", 10)).thenReturn(List.of());
+        when(semanticSearchService.searchByQuery("fitness tips", "user1", 10)).thenReturn(expected);
 
         ResponseEntity<SearchResponse> result = semanticSearchController.search(request);
 
         assertThat(result.getBody()).isNotNull();
+        assertThat(result.getBody().getPosts()).hasSize(1);
+        assertThat(result.getBody().getAiExplanation()).contains("fitness");
     }
 }

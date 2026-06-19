@@ -1,50 +1,42 @@
 package com.example.recommendationservice.service;
 
-import com.example.recommendationservice.model.UserProfile;
-import com.example.recommendationservice.repository.UserProfileRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.SetOperations;
 
-import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class SocialGraphServiceTest {
 
-    @Mock private UserProfileRepository userProfileRepository;
+    @Mock private RedisTemplate<String, Object> redisTemplate;
+    @Mock private SetOperations<String, Object> setOperations;
 
     @InjectMocks
     private SocialGraphService socialGraphService;
 
-    private UserProfile testUser;
-
-    @BeforeEach
-    void setUp() {
-        testUser = new UserProfile();
-        testUser.setUserId("user1");
-        testUser.setFollowingIds(List.of("user2", "user3"));
-    }
-
     @Test
     void getFollowing_returnsFollowingIds() {
-        when(userProfileRepository.findById("user1")).thenReturn(Optional.of(testUser));
+        when(redisTemplate.opsForSet()).thenReturn(setOperations);
+        when(setOperations.members("social:user1:following")).thenReturn(Set.of("user2", "user3"));
 
         Set<String> result = socialGraphService.getFollowing("user1");
 
-        assertThat(result).contains("user2", "user3");
+        assertThat(result).containsExactlyInAnyOrder("user2", "user3");
     }
 
     @Test
-    void getFollowing_returnsEmptyWhenUserNotFound() {
-        when(userProfileRepository.findById("user1")).thenReturn(Optional.empty());
+    void getFollowing_returnsEmptyWhenNoData() {
+        when(redisTemplate.opsForSet()).thenReturn(setOperations);
+        when(setOperations.members("social:user1:following")).thenReturn(null);
 
         Set<String> result = socialGraphService.getFollowing("user1");
 
@@ -53,42 +45,45 @@ class SocialGraphServiceTest {
 
     @Test
     void getFollowers_returnsFollowers() {
-        UserProfile follower = new UserProfile();
-        follower.setUserId("user2");
-        follower.setFollowingIds(List.of("user1"));
+        when(redisTemplate.opsForSet()).thenReturn(setOperations);
+        when(setOperations.members("social:user1:followers")).thenReturn(Set.of("user2"));
 
-        when(userProfileRepository.findFollowers("user1")).thenReturn(List.of(follower));
-
-        List<String> result = socialGraphService.getFollowers("user1");
+        Set<String> result = socialGraphService.getFollowers("user1");
 
         assertThat(result).contains("user2");
     }
 
     @Test
-    void addFollowing_addsToFollowingList() {
-        when(userProfileRepository.findById("user1")).thenReturn(Optional.of(testUser));
-        when(userProfileRepository.save(any(UserProfile.class))).thenReturn(testUser);
+    void follow_addsToFollowingAndFollowersSets() {
+        when(redisTemplate.opsForSet()).thenReturn(setOperations);
 
-        socialGraphService.addFollowing("user1", "user4");
+        socialGraphService.follow("user1", "user2");
 
-        assertThat(testUser.getFollowingIds()).contains("user4");
-        verify(userProfileRepository).save(testUser);
+        verify(setOperations).add("social:user1:following", "user2");
+        verify(setOperations).add("social:user2:followers", "user1");
     }
 
     @Test
-    void removeFollowing_removesFromFollowingList() {
-        when(userProfileRepository.findById("user1")).thenReturn(Optional.of(testUser));
-        when(userProfileRepository.save(any(UserProfile.class))).thenReturn(testUser);
-
-        socialGraphService.removeFollowing("user1", "user2");
-
-        assertThat(testUser.getFollowingIds()).doesNotContain("user2");
-        verify(userProfileRepository).save(testUser);
+    void follow_rejectsSelfFollow() {
+        assertThatThrownBy(() -> socialGraphService.follow("user1", "user1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot follow themselves");
     }
 
     @Test
-    void getMuted_returnsEmptySet() {
-        when(userProfileRepository.findById("user1")).thenReturn(Optional.of(testUser));
+    void unfollow_removesFromFollowingAndFollowersSets() {
+        when(redisTemplate.opsForSet()).thenReturn(setOperations);
+
+        socialGraphService.unfollow("user1", "user2");
+
+        verify(setOperations).remove("social:user1:following", "user2");
+        verify(setOperations).remove("social:user2:followers", "user1");
+    }
+
+    @Test
+    void getMuted_returnsEmptySetWhenUnset() {
+        when(redisTemplate.opsForSet()).thenReturn(setOperations);
+        when(setOperations.members("social:user1:muted")).thenReturn(null);
 
         Set<String> result = socialGraphService.getMuted("user1");
 

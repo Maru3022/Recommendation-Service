@@ -31,30 +31,27 @@ class ScoringServiceTest {
         weights.setContent(0.20);
         weights.setTrending(0.15);
         weights.setFreshness(0.05);
-
-        when(feedProperties.getWeights()).thenReturn(weights);
-        when(feedProperties.getFreshnessHalfLifeHours()).thenReturn(48.0);
     }
 
     @Test
     void calculateFeedScore_combinesAllSignals() {
-        double social = 1.0;
-        double collaborative = 0.5;
-        double content = 0.8;
-        double trending = 0.6;
-        Instant createdAt = Instant.now();
+        when(feedProperties.getWeights()).thenReturn(weights);
+        when(feedProperties.getFreshnessHalfLifeHours()).thenReturn(48);
 
-        double score = scoringService.calculateFeedScore(social, collaborative, content, trending, createdAt);
+        double score = scoringService.calculateFeedScore(1.0, 0.5, 0.8, 0.6, Instant.now());
 
         assertThat(score).isGreaterThan(0);
         assertThat(score).isLessThan(1.0);
     }
 
     @Test
-    void calculateFeedScore_zeroSignalsReturnsZero() {
+    void calculateFeedScore_zeroSignalsStillHasFreshness() {
+        when(feedProperties.getWeights()).thenReturn(weights);
+        when(feedProperties.getFreshnessHalfLifeHours()).thenReturn(48);
+
         double score = scoringService.calculateFeedScore(0, 0, 0, 0, Instant.now());
 
-        assertThat(score).isGreaterThan(0); // freshness still contributes
+        assertThat(score).isGreaterThan(0);
     }
 
     @Test
@@ -67,36 +64,30 @@ class ScoringServiceTest {
 
     @Test
     void calculateEngagementScore_handlesZeroEngagement() {
-        double score = scoringService.calculateEngagementScore(0, 0, 0, 0);
-
-        assertThat(score).isEqualTo(0.0);
+        assertThat(scoringService.calculateEngagementScore(0, 0, 0, 0)).isEqualTo(0.0);
     }
 
     @Test
     void calculateEngagementScore_handlesHighEngagement() {
-        double score = scoringService.calculateEngagementScore(10000, 5000, 2000, 1000);
-
-        assertThat(score).isEqualTo(1.0); // capped at 1.0
+        assertThat(scoringService.calculateEngagementScore(10000, 5000, 2000, 1000)).isEqualTo(1.0);
     }
 
     @Test
     void freshnessScore_recentPostReturnsHighScore() {
-        double score = scoringService.freshnessScore(Instant.now());
+        when(feedProperties.getFreshnessHalfLifeHours()).thenReturn(48);
 
-        assertThat(score).isGreaterThan(0.9);
+        assertThat(scoringService.freshnessScore(Instant.now())).isGreaterThan(0.9);
     }
 
     @Test
     void freshnessScore_oldPostReturnsLowScore() {
-        double score = scoringService.freshnessScore(Instant.now().minusSeconds(86400 * 10)); // 10 days old
+        when(feedProperties.getFreshnessHalfLifeHours()).thenReturn(48);
 
-        assertThat(score).isLessThan(0.5);
+        assertThat(scoringService.freshnessScore(Instant.now().minusSeconds(86400 * 10))).isLessThan(0.5);
     }
 
     @Test
     void freshnessScore_nullCreatedAtReturnsZero() {
-        double score = scoringService.freshnessScore(null);
-
-        assertThat(score).isEqualTo(0.0);
+        assertThat(scoringService.freshnessScore(null)).isEqualTo(0.0);
     }
 }

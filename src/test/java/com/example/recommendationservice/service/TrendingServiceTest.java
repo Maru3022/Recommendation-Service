@@ -1,6 +1,8 @@
 package com.example.recommendationservice.service;
 
+import com.example.recommendationservice.config.FeedProperties;
 import com.example.recommendationservice.model.PostDoc;
+import com.example.recommendationservice.repository.PostActionRepository;
 import com.example.recommendationservice.repository.PostSearchRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -8,22 +10,26 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class TrendingServiceTest {
 
+    @Mock private PostActionRepository postActionRepository;
     @Mock private PostSearchRepository postSearchRepository;
+    @Mock private RedisTemplate<String, Object> redisTemplate;
+    @Mock private ZSetOperations<String, Object> zSetOperations;
+    @Mock private FeedProperties feedProperties;
 
     @InjectMocks
     private TrendingService trendingService;
@@ -42,9 +48,10 @@ class TrendingServiceTest {
     }
 
     @Test
-    void getTrendingPosts_returnsMostEngagedPosts() {
-        Page<PostDoc> page = new PageImpl<>(List.of(testPost));
-        when(postSearchRepository.findAll(any(Pageable.class))).thenReturn(page);
+    void getTrendingPosts_returnsCachedPosts() {
+        when(redisTemplate.opsForZSet()).thenReturn(zSetOperations);
+        when(zSetOperations.reverseRange("trending:posts", 0, 9)).thenReturn(Set.of("post1"));
+        when(postSearchRepository.findByIdIn(List.of("post1"))).thenReturn(List.of(testPost));
 
         List<PostDoc> result = trendingService.getTrendingPosts(10);
 
@@ -53,23 +60,27 @@ class TrendingServiceTest {
     }
 
     @Test
-    void getTrendingPosts_respectsLimit() {
-        PostDoc post2 = new PostDoc();
-        post2.setId("post2");
-        post2.setLikesCount(50);
-        
-        Page<PostDoc> page = new PageImpl<>(List.of(testPost, post2));
-        when(postSearchRepository.findAll(any(Pageable.class))).thenReturn(page);
+    void getTrendingPosts_refreshesWhenCacheEmpty() {
+        when(redisTemplate.opsForZSet()).thenReturn(zSetOperations);
+        when(zSetOperations.reverseRange("trending:posts", 0, 0)).thenReturn(Set.of());
+        when(feedProperties.getTrendingWindowHours()).thenReturn(72);
+        when(postActionRepository.findTrendingPostIds(any(), eq(PageRequest.of(0, 200))))
+                .thenReturn(List.<Object[]>of(new Object[]{"post1", 42L}));
+        when(postSearchRepository.findByIdIn(List.of("post1"))).thenReturn(List.of(testPost));
 
         List<PostDoc> result = trendingService.getTrendingPosts(1);
 
         assertThat(result).hasSize(1);
+        verify(zSetOperations).add("trending:posts", "post1", 42.0);
     }
 
     @Test
     void getTrendingPosts_emptyRepositoryReturnsEmptyList() {
-        Page<PostDoc> page = new PageImpl<>(List.of());
-        when(postSearchRepository.findAll(any(Pageable.class))).thenReturn(page);
+        when(redisTemplate.opsForZSet()).thenReturn(zSetOperations);
+        when(zSetOperations.reverseRange("trending:posts", 0, 9)).thenReturn(null);
+        when(feedProperties.getTrendingWindowHours()).thenReturn(72);
+        when(postActionRepository.findTrendingPostIds(any(), eq(PageRequest.of(0, 200))))
+                .thenReturn(List.of());
 
         List<PostDoc> result = trendingService.getTrendingPosts(10);
 
