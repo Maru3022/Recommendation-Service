@@ -18,6 +18,12 @@ public interface PostActionRepository extends JpaRepository<PostAction, Long> {
 
     List<PostAction> findByUserIdOrderByCreatedAtDesc(String userId, Pageable pageable);
 
+    List<PostAction> findByUserId(String userId);
+
+    List<PostAction> findByPostId(String postId);
+
+    List<PostAction> findByPostIdIn(List<String> postIds);
+
     @Query("SELECT pa.postId, COUNT(pa) as cnt FROM PostAction pa WHERE pa.createdAt >= :since AND pa.actionType != 'SKIP' GROUP BY pa.postId ORDER BY cnt DESC")
     List<Object[]> findTrendingPostIds(@Param("since") Instant since, Pageable pageable);
 

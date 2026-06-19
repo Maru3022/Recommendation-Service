@@ -15,7 +15,11 @@ public interface PostSearchRepository extends ElasticsearchRepository<PostDoc, S
 
     Page<PostDoc> findByCategoryOrderByLikesCountDesc(String category, Pageable pageable);
 
+    List<PostDoc> findByCategory(String category, Pageable pageable);
+
     List<PostDoc> findByTagsIn(List<String> tags, Pageable pageable);
 
     List<PostDoc> findByIdIn(List<String> ids);
+
+    List<PostDoc> findAllByIdIn(List<String> ids);
 }

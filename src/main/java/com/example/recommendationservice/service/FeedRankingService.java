@@ -45,18 +45,6 @@ import java.util.stream.Collectors;
 @Slf4j
 public class FeedRankingService {
 
-    // ---- injected weights (from application.properties) ----
-    @Value("${recommendation.feed.weights.social:0.35}")
-    private double wSocial;
-    @Value("${recommendation.feed.weights.collaborative:0.25}")
-    private double wCollaborative;
-    @Value("${recommendation.feed.weights.content:0.20}")
-    private double wContent;
-    @Value("${recommendation.feed.weights.trending:0.15}")
-    private double wTrending;
-    @Value("${recommendation.feed.weights.freshness:0.05}")
-    private double wFreshness;
-
     private static final int TRENDING_WINDOW_HOURS = 72;
     private static final int MAX_AUTHOR_PER_PAGE    = 2;   // diversity guard
 
@@ -65,6 +53,7 @@ public class FeedRankingService {
     private final SocialGraphService      socialGraphService;
     private final RedisTemplate<String, Object> redisTemplate;
     private final ElasticsearchOperations elasticsearchOperations;
+    private final ScoringService         scoringService;
 
     // =========================================================================
     // Main personalized feed
@@ -88,7 +77,7 @@ public class FeedRankingService {
 
         List<FeedResponse.RankedPost> ranked = candidates.stream()
                 .filter(p -> !muted.contains(p.getAuthorId()))          // negative signal: muted authors
-                .filter(p -> "PUBLIC".equalsIgnoreCase(p.getVisibility()))
+                .filter(p -> p.getVisibility() == null || "PUBLIC".equalsIgnoreCase(p.getVisibility()))
                 .map(post -> {
                     double score = hybridScore(post, userId, following, trendingIds, seenPostIds, contentScores);
                     return FeedResponse.RankedPost.builder().post(post).score(score).build();
@@ -167,7 +156,7 @@ public class FeedRankingService {
             NativeQuery query = NativeQuery.builder()
                     .withMaxResults(0)
                     .withQuery(Query.of(q -> q.range(r ->
-                            r.untyped(u -> u.field("createdAt").gte(co.elastic.clients.json.JsonData.of(windowStart))))))
+                            r.field("createdAt").gte(co.elastic.clients.json.JsonData.of(windowStart)))))
                     .withAggregation("trending_posts", Aggregation.of(a -> a
                             .terms(t -> t.field("postId").size(limit))))
                     .build();
@@ -180,7 +169,7 @@ public class FeedRankingService {
                 return fetchRecentPosts(limit);
             }
 
-            return postSearchRepository.findAllByIdIn(trendingIds);
+            return postSearchRepository.findByIdIn(trendingIds);
         } catch (Exception e) {
             log.error("Error getting trending posts, falling back to recent", e);
             return fetchRecentPosts(limit);
@@ -201,8 +190,8 @@ public class FeedRankingService {
 
             for (String similar : similarUsers) {
                 postActionRepository.findByUserId(similar).stream()
-                        .filter(a -> "LIKE".equalsIgnoreCase(a.getActionType())
-                                || "SAVE".equalsIgnoreCase(a.getActionType()))
+                        .filter(a -> a.getActionType() == PostAction.ActionType.LIKE
+                                || a.getActionType() == PostAction.ActionType.SAVE)
                         .map(PostAction::getPostId)
                         .filter(id -> !seenByUser.contains(id))
                         .forEach(candidateIds::add);
@@ -210,7 +199,7 @@ public class FeedRankingService {
 
             if (candidateIds.isEmpty()) return Collections.emptyList();
 
-            return postSearchRepository.findAllByIdIn(new ArrayList<>(candidateIds))
+            return postSearchRepository.findByIdIn(new ArrayList<>(candidateIds))
                     .stream().limit(limit).collect(Collectors.toList());
         } catch (Exception e) {
             log.error("Error in collaborative recommendations for user {}", userId, e);
@@ -242,7 +231,7 @@ public class FeedRankingService {
                 int perCat = Math.max(1, limit / topCategories.size());
                 Pageable p = PageRequest.of(0, perCat);
                 postSearchRepository.findByCategory(category, p)
-                        .getContent().stream()
+                        .stream()
                         .filter(post -> !seen.contains(post.getId()))
                         .forEach(result::add);
             }
@@ -285,24 +274,8 @@ public class FeedRankingService {
         double collaborative = seenPostIds.contains(post.getId())   ? 0.0 : 0.5; // unfiltered placeholder
         double content     = contentScores.getOrDefault(post.getId(), 0.0);
         double trending    = trendingIds.contains(post.getId())     ? 1.0 : 0.0;
-        double freshness   = computeFreshnessScore(post.getCreatedAt());
 
-        return wSocial      * social
-             + wCollaborative * collaborative
-             + wContent     * content
-             + wTrending    * trending
-             + wFreshness   * freshness;
-    }
-
-    /**
-     * Exponential decay: score = exp(-lambda * ageHours)
-     * Half-life ≈ 48 h → lambda = ln(2)/48
-     */
-    private double computeFreshnessScore(Instant createdAt) {
-        if (createdAt == null) return 0.0;
-        double ageHours = ChronoUnit.HOURS.between(createdAt, Instant.now());
-        double lambda = Math.log(2) / 48.0;
-        return Math.exp(-lambda * Math.max(ageHours, 0));
+        return scoringService.calculateFeedScore(social, collaborative, content, trending, post.getCreatedAt());
     }
 
     /**
@@ -345,7 +318,7 @@ public class FeedRankingService {
             NativeQuery query = NativeQuery.builder()
                     .withMaxResults(0)
                     .withQuery(Query.of(q -> q.range(r ->
-                            r.untyped(u -> u.field("createdAt").gte(co.elastic.clients.json.JsonData.of(windowStart))))))
+                            r.field("createdAt").gte(co.elastic.clients.json.JsonData.of(windowStart)))))
                     .withAggregation("trending", Aggregation.of(a -> a
                             .terms(t -> t.field("postId").size(limit))))
                     .build();

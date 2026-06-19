@@ -1,7 +1,9 @@
 package com.example.recommendationservice.service;
 
 import com.example.recommendationservice.model.UserProfile;
+import com.example.recommendationservice.model.UserProfileDoc;
 import com.example.recommendationservice.repository.UserProfileRepository;
+import com.example.recommendationservice.repository.UserProfileSearchRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ import java.util.Optional;
 public class UserProfileService {
 
     private final UserProfileRepository userProfileRepository;
+    private final UserProfileSearchRepository userProfileSearchRepository;
     private final ObjectMapper objectMapper;
 
     @Value("${recommendation.action.interest-embedding-alpha-percent:30}")
@@ -53,6 +56,9 @@ public class UserProfileService {
         profile.setInterestEmbeddingJson(serializeEmbedding(updated));
         profile.setUpdatedAt(Instant.now());
         userProfileRepository.save(profile);
+
+        // Sync to Elasticsearch for kNN similarity search
+        syncToElasticsearch(userId, updated);
     }
 
     @Transactional
@@ -97,6 +103,18 @@ public class UserProfileService {
         } catch (Exception e) {
             log.warn("Failed to serialize embedding: {}", e.getMessage());
             return null;
+        }
+    }
+
+    private void syncToElasticsearch(String userId, float[] embedding) {
+        try {
+            UserProfileDoc doc = new UserProfileDoc();
+            doc.setUserId(userId);
+            doc.setInterestEmbedding(embedding);
+            doc.setUpdatedAt(Instant.now());
+            userProfileSearchRepository.save(doc);
+        } catch (Exception e) {
+            log.warn("Failed to sync user embedding to Elasticsearch for {}: {}", userId, e.getMessage());
         }
     }
 }

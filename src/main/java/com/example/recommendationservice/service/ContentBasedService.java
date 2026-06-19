@@ -35,7 +35,7 @@ public class ContentBasedService {
         }
 
         UserProfile profile = userProfileRepository.findById(userId).orElse(null);
-        Set<String> viewed = profile != null ? profile.getViewedPostIds() : Collections.emptySet();
+        Set<String> viewed = profile != null ? new java.util.HashSet<>(profile.getViewedPostIds()) : Collections.emptySet();
 
         try {
             return performKnnSearch(embedding, limit, excludeIds, viewed);

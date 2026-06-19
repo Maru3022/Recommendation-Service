@@ -130,7 +130,7 @@ public class SemanticSearchService {
             String postContext = posts.stream()
                     .map(p -> String.format("- [%s] by %s | tags: %s | text: %s",
                             p.getPostType(),
-                            p.getAuthorDisplayName() != null ? p.getAuthorDisplayName() : "unknown",
+                            p.getAuthorId() != null ? p.getAuthorId() : "unknown",
                             p.getTags() != null ? String.join(", ", p.getTags()) : "",
                             p.getText() != null ? p.getText().substring(0, Math.min(p.getText().length(), 120)) : ""))
                     .collect(Collectors.joining("\n"));

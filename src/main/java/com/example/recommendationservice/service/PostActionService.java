@@ -46,12 +46,12 @@ public class PostActionService {
     // Public API
     // -------------------------------------------------------------------------
 
-    public PostAction trackAction(String postId, String userId, String actionType) {
+    public PostAction trackAction(String userId, String postId, String actionType) {
+        PostAction.ActionType actionTypeEnum = PostAction.ActionType.valueOf(actionType.toUpperCase());
         PostAction action = PostAction.builder()
-                .id(UUID.randomUUID().toString())
                 .postId(postId)
                 .userId(userId)
-                .actionType(actionType)
+                .actionType(actionTypeEnum)
                 .createdAt(Instant.now())
                 .build();
 
@@ -66,12 +66,29 @@ public class PostActionService {
         return postActionRepository.findByUserId(userId);
     }
 
+    public List<PostAction> getActionsByPostId(String postId) {
+        return postActionRepository.findByPostId(postId);
+    }
+
+    public Optional<PostAction> getActionById(String id) {
+        try {
+            return postActionRepository.findById(Long.parseLong(id));
+        } catch (NumberFormatException e) {
+            return Optional.empty();
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
 
     private void updateUserPreferences(String postId, String userId, String actionType) {
-        int weight = actionWeight(actionType);
+        PostAction.ActionType actionTypeEnum = PostAction.ActionType.valueOf(actionType.toUpperCase());
+        int weight = actionTypeEnum == PostAction.ActionType.VIEW ? 1 
+                : actionTypeEnum == PostAction.ActionType.LIKE ? 3
+                : actionTypeEnum == PostAction.ActionType.SAVE ? 4
+                : actionTypeEnum == PostAction.ActionType.COMMENT || actionTypeEnum == PostAction.ActionType.SHARE ? 2
+                : 0;
         if (weight == 0) return;
 
         try {

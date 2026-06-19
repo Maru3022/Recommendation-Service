@@ -21,6 +21,8 @@ public class PostSummaryDto {
     private List<String> tags;
     private long likesCount;
     private long commentsCount;
+    private long sharesCount;
+    private long savesCount;
     private double score;
     private Instant createdAt;
 }

@@ -21,6 +21,7 @@ public class FeedScoringService {
     private final CollaborativeFilteringService collaborativeFilteringService;
     private final ContentBasedService contentBasedService;
     private final TrendingService trendingService;
+    private final ScoringService scoringService;
     private final FeedProperties feedProperties;
 
     public List<PostSummaryDto> buildFeed(String userId, int candidateCount, Set<String> excludeIds) {
@@ -43,7 +44,10 @@ public class FeedScoringService {
 
         Set<String> trendingIds = trendingPosts.stream().map(PostDoc::getId).collect(Collectors.toSet());
         Map<String, Double> trendingScores = trendingPosts.stream()
-                .collect(Collectors.toMap(PostDoc::getId, this::engagementScore));
+                .collect(Collectors.toMap(PostDoc::getId, 
+                    post -> scoringService.calculateEngagementScore(
+                        post.getLikesCount(), post.getCommentsCount(), 
+                        post.getSavesCount(), post.getSharesCount())));
 
         Map<String, PostDoc> allCandidates = new LinkedHashMap<>();
         socialPosts.forEach(p -> allCandidates.put(p.getId(), p));
@@ -55,21 +59,15 @@ public class FeedScoringService {
         Set<String> collaborativeIds = collaborativePosts.stream().map(PostDoc::getId).collect(Collectors.toSet());
         Set<String> contentIds = contentPosts.stream().map(PostDoc::getId).collect(Collectors.toSet());
 
-        FeedProperties.Weights w = feedProperties.getWeights();
-
         return allCandidates.values().stream()
                 .map(post -> {
                     double social = socialIds.contains(post.getId()) ? 1.0 : 0.0;
                     double collaborative = collaborativeIds.contains(post.getId()) ? 1.0 : 0.0;
                     double content = contentIds.contains(post.getId()) ? 1.0 : 0.0;
                     double trending = trendingScores.getOrDefault(post.getId(), 0.0);
-                    double freshness = freshnessScore(post.getCreatedAt());
 
-                    double score = w.getSocial() * social
-                            + w.getCollaborative() * collaborative
-                            + w.getContent() * content
-                            + w.getTrending() * trending
-                            + w.getFreshness() * freshness;
+                    double score = scoringService.calculateFeedScore(
+                            social, collaborative, content, trending, post.getCreatedAt());
 
                     return PostSummaryDto.builder()
                             .postId(post.getId())
@@ -86,20 +84,5 @@ public class FeedScoringService {
                 })
                 .sorted(Comparator.comparingDouble(PostSummaryDto::getScore).reversed())
                 .collect(Collectors.toList());
-    }
-
-    private double freshnessScore(Instant createdAt) {
-        if (createdAt == null) return 0.0;
-        long hoursOld = Duration.between(createdAt, Instant.now()).toHours();
-        double halfLife = feedProperties.getFreshnessHalfLifeHours();
-        return Math.pow(0.5, hoursOld / halfLife);
-    }
-
-    private double engagementScore(PostDoc post) {
-        double raw = post.getLikesCount()
-                + 2.0 * post.getCommentsCount()
-                + 3.0 * post.getSavesCount()
-                + post.getSharesCount();
-        return Math.min(raw / 1000.0, 1.0);
     }
 }

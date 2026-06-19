@@ -84,15 +84,9 @@ public class TrainingEventConsumer {
     private PostDoc buildPost(PostDoc event, String postType, List<String> defaultTags) {
         PostDoc post = new PostDoc();
         post.setAuthorId(event.getAuthorId());
-        post.setAuthorDisplayName(event.getAuthorDisplayName());
-        post.setAuthorAvatarUrl(event.getAuthorAvatarUrl());
         post.setText(event.getText() != null ? event.getText() : "");
-        post.setMediaUrls(event.getMediaUrls());
         post.setPostType(postType);
         post.setCategory(event.getCategory());
-        post.setRelatedTrainingId(event.getRelatedTrainingId());
-        post.setDurationMinutes(event.getDurationMinutes());
-        post.setCaloriesBurned(event.getCaloriesBurned());
         post.setVisibility(event.getVisibility() != null ? event.getVisibility() : "PUBLIC");
         post.setCreatedAt(event.getCreatedAt() != null ? event.getCreatedAt() : Instant.now());
 

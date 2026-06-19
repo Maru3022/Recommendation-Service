@@ -57,10 +57,27 @@ public class FeedService {
 
     public void invalidateCache(String userId) {
         try {
-            var keys = redisTemplate.keys(FEED_CACHE_PREFIX + userId + ":*");
-            if (keys != null && !keys.isEmpty()) {
-                redisTemplate.delete(keys);
-                log.debug("Invalidated {} cache keys for user {}", keys.size(), userId);
+            String pattern = FEED_CACHE_PREFIX + userId + ":*";
+            org.springframework.data.redis.core.Cursor<String> cursor = redisTemplate.scan(
+                    org.springframework.data.redis.core.ScanOptions.scanOptions()
+                            .match(pattern)
+                            .count(100)
+                            .build()
+            );
+            
+            List<String> keysToDelete = new java.util.ArrayList<>();
+            while (cursor.hasNext()) {
+                keysToDelete.add(cursor.next());
+                if (keysToDelete.size() >= 1000) {
+                    redisTemplate.delete(keysToDelete);
+                    keysToDelete.clear();
+                }
+            }
+            cursor.close();
+            
+            if (!keysToDelete.isEmpty()) {
+                redisTemplate.delete(keysToDelete);
+                log.debug("Invalidated {} cache keys for user {}", keysToDelete.size(), userId);
             }
         } catch (Exception e) {
             log.warn("Failed to invalidate cache for user {}: {}", userId, e.getMessage());

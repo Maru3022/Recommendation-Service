@@ -1,5 +1,7 @@
 package com.example.recommendationservice.model;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
@@ -11,7 +13,9 @@ import java.time.Instant;
 import java.util.List;
 
 @Data
+@Builder
 @NoArgsConstructor
+@AllArgsConstructor
 @Document(indexName = "posts")
 public class PostDoc {
 
@@ -20,6 +24,9 @@ public class PostDoc {
 
     @Field(type = FieldType.Keyword)
     private String authorId;
+
+    @Field(type = FieldType.Keyword)
+    private String visibility;
 
     @Field(type = FieldType.Text)
     private String text;
