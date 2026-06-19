@@ -134,4 +134,31 @@ public class RagRecommendationServiceTest {
         assertNotNull(response);
         assertNotNull(response.getProducts());
     }
+
+    @Test
+    void searchByQuery_WithValidEmbedding_ShouldUseKnnSearch() {
+        // Given
+        String query = "I need a laptop";
+        String userId = "user1";
+        when(embeddingService.generateEmbeddingForQuery(query)).thenReturn(Optional.of(sampleEmbedding));
+
+        // Mock Elasticsearch kNN search
+        SearchHit<ProductDoc> searchHit1 = mock(SearchHit.class);
+        SearchHit<ProductDoc> searchHit2 = mock(SearchHit.class);
+        when(searchHit1.getContent()).thenReturn(sampleProducts.get(0));
+        when(searchHit2.getContent()).thenReturn(sampleProducts.get(1));
+        SearchHits<ProductDoc> searchHits = mock(SearchHits.class);
+        when(searchHits.getSearchHits()).thenReturn(Arrays.asList(searchHit1, searchHit2));
+        lenient().when(elasticsearchOperations.search(any(org.springframework.data.elasticsearch.core.query.Query.class), eq(ProductDoc.class))).thenReturn(searchHits);
+
+        // When
+        RagResponse response = ragRecommendationService.searchByQuery(query, userId, 10);
+
+        // Then
+        assertNotNull(response);
+        assertNotNull(response.getProducts());
+        assertEquals(2, response.getProducts().size());
+        verify(elasticsearchOperations, times(1)).search(any(org.springframework.data.elasticsearch.core.query.Query.class), eq(ProductDoc.class));
+        verify(productSearchRepository, never()).findAll(any(PageRequest.class));
+    }
 }

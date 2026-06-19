@@ -15,6 +15,7 @@ import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.data.elasticsearch.core.query.StringQuery;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -64,9 +65,34 @@ public class RagRecommendationService {
 
     private List<ProductDoc> performKnnSearch(float[] queryEmbedding, int limit) {
         try {
-            // Temporarily use fallback until kNN is properly implemented
-            log.warn("kNN search temporarily using fallback implementation");
-            return performFallbackSearch("", limit);
+            int numCandidates = Math.max(limit * 10, 50);
+            
+            // Build kNN search JSON
+            // Convert Java float array to JSON array string
+            StringBuilder sb = new StringBuilder("[");
+            for (int i = 0; i < queryEmbedding.length; i++) {
+                if (i > 0) {
+                    sb.append(",");
+                }
+                sb.append(queryEmbedding[i]);
+            }
+            sb.append("]");
+            String queryVectorJson = sb.toString();
+
+            String queryString = String.format(
+                "{\"knn\": {\"field\": \"embedding\", \"query_vector\": %s, \"k\": %d, \"num_candidates\": %d}, \"size\": %d}",
+                queryVectorJson, limit, numCandidates, limit
+            );
+
+            StringQuery stringQuery = new StringQuery(queryString);
+            SearchHits<ProductDoc> searchHits = elasticsearchOperations.search(stringQuery, ProductDoc.class);
+
+            List<ProductDoc> products = searchHits.getSearchHits().stream()
+                    .map(SearchHit::getContent)
+                    .collect(Collectors.toList());
+
+            log.info("kNN search returned {} products", products.size());
+            return products;
         } catch (Exception e) {
             log.error("Error performing kNN search", e);
             return List.of();
