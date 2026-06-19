@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <springProperty scope="context" name="appName" source="spring.application.name"/>
+
+    <!-- JSON logs for Docker / production — parsed by Loki (| json) and Promtail -->
+    <springProfile name="docker | prod">
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <includeMdcKeyName>correlationId</includeMdcKeyName>
+                <includeMdcKeyName>requestId</includeMdcKeyName>
+                <customFields>{"service":"${appName}"}</customFields>
+            </encoder>
+        </appender>
+    </springProfile>
+
+    <!-- Human-readable logs for local development and tests -->
+    <springProfile name="!docker &amp; !prod">
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [correlationId=%X{correlationId} requestId=%X{requestId}] - %msg%n</pattern>
+            </encoder>
+        </appender>
+    </springProfile>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>

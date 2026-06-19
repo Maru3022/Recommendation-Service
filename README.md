@@ -44,6 +44,7 @@ A production-ready recommendation engine that provides personalized content feed
 ### Observability
 - `GET /actuator/health`, `/actuator/metrics`, `/actuator/prometheus`
 - SpringDoc OpenAPI UI at `http://localhost:8026/swagger-ui.html`
+- **Grafana logs & metrics**: `docker compose up -d` → http://localhost:3000 (`admin` / `admin`) — see [docs/observability.md](docs/observability.md)
 
 ## Hybrid ranking algorithm
 
@@ -113,7 +114,13 @@ Additional guards:
 cd frontend && npm install && npm start
 ```
 
-Requires: Elasticsearch, Redis, Kafka, PostgreSQL (see `docker-compose` or k8s overlays).
+Requires: Elasticsearch, Redis, Kafka, PostgreSQL — start everything with Docker Compose:
+
+```bash
+docker compose up -d
+```
+
+See [docs/observability.md](docs/observability.md) for Grafana log viewing. For Kubernetes, use the `k8s/` overlays.
 
 ## Configuration
 

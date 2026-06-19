@@ -1,0 +1,106 @@
+# Observability stack only — use when the app and dependencies run outside Docker.
+# Start with: docker compose -f docker-compose.observability.yml up -d
+
+name: recommendation-service
+
+services:
+  loki:
+    image: grafana/loki:2.9.8
+    command: -config.file=/etc/loki/loki-config.yml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki-data:/tmp/loki
+    networks:
+      - recommendation-net
+
+  promtail:
+    image: grafana/promtail:2.9.8
+    command: -config.file=/etc/promtail/promtail-config.yml
+    volumes:
+      - ./monitoring/promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - promtail-positions:/tmp
+    depends_on:
+      - loki
+    networks:
+      - recommendation-net
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    extra_hosts:
+      - "recommendation-service:host-gateway"
+    networks:
+      - recommendation-net
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    networks:
+      - recommendation-net
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    command:
+      - --path.rootfs=/host
+    volumes:
+      - /:/host:ro,rslave
+    networks:
+      - recommendation-net
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    ports:
+      - "8081:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - recommendation-net
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: http://localhost:3000
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - loki
+      - prometheus
+    networks:
+      - recommendation-net
+
+networks:
+  recommendation-net:
+    driver: bridge
+
+volumes:
+  loki-data:
+  promtail-positions:
+  prometheus-data:
+  grafana-data:
