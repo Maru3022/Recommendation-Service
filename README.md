@@ -1,387 +1,123 @@
 # Recommendation Service
 
-Recommendation microservice on Spring Boot (Java 21) that provides:
+Personalized fitness post feed microservice — part of a Spring Boot 3.4.2 / Java 21 fitness app.
 
-- **Personalized recommendations** (Redis preference key → Elasticsearch search)
-- **Popular products** (Elasticsearch aggregation over user actions)
-- **Collaborative / Content-based / Trending** modes (baseline algorithms in code)
-- **User action tracking** (writes to Elasticsearch + updates Redis preference signals)
-- **Realtime product sync** from Kafka to Elasticsearch
-- **OpenAPI UI** and Actuator metrics
+Replaces the previous "product recommendations" prototype with a fully reworked social feed engine modelled after Strava/Instagram but focused on workout posts, achievements, and training tips.
 
-This repository contains:
-- backend (`src/main/java`)
-- React frontend (`frontend/`)
-- Kubernetes manifests (`k8s/`)
-- monitoring configs (`monitoring/`)
-- CI/CD workflow (`.github/workflows/main.yml`)
+## Features
 
-## 🚀 Features (as implemented)
+### Feed API (`/api/feed`)
+| Endpoint | Description |
+|---|---|
+| `GET /api/feed/{userId}?page=&size=` | **Hybrid-ranked personal feed** — blends social, collaborative, content-based, trending, and freshness signals |
+| `GET /api/feed/{userId}/following?page=&size=` | Chronological feed from followed users only |
+| `GET /api/feed/trending?limit=` | Global trending posts (72-hour interaction window) |
+| `GET /api/feed/{userId}/collaborative?limit=` | Raw collaborative-filter signal (debug/A-B) |
+| `GET /api/feed/{userId}/content-based?limit=` | Raw content-based signal (debug/A-B) |
+| `POST /api/feed/search` | Semantic (kNN + LLM) post search |
 
-### Recommendations API
-- `GET /api/recommendations/{userId}?page=&size=` — personalized (uses Redis key `user:{userId}:fav_category`)
-- `GET /api/recommendations/popular?limit=` — popular products
-- `GET /api/recommendations/{userId}/collaborative?limit=` — collaborative baseline
-- `GET /api/recommendations/{userId}/content-based?limit=` — content-based baseline
-- `GET /api/recommendations/trending?limit=` — trending baseline
+### Post API (`/api/posts`)
+| Endpoint | Description |
+|---|---|
+| `POST /api/posts` | Create post |
+| `GET /api/posts/{postId}` | Get post by ID |
+| `DELETE /api/posts/{postId}?requestingUserId=` | Delete post (author-only) |
+| `POST /api/posts/{postId}/actions` | Track action — VIEW / LIKE / COMMENT / SHARE / SAVE / HIDE / REPORT |
+| `GET /api/posts/{userId}/history` | User action history |
 
-### User actions API
-- `POST /api/user-actions` — track action (`userId`, `productId`, `actionType`)
-- `GET /api/user-actions/{userId}/history` — fetch action history
+### Social Graph API (`/api/social`)
+| Endpoint | Description |
+|---|---|
+| `POST /api/social/{userId}/follow/{targetId}` | Follow a user |
+| `DELETE /api/social/{userId}/follow/{targetId}` | Unfollow |
+| `GET /api/social/{userId}/following` | Who userId follows |
+| `GET /api/social/{userId}/followers` | Who follows userId |
 
 ### Observability
-- `GET /actuator/health`, `GET /actuator/metrics`, `GET /actuator/prometheus`
+- `GET /actuator/health`, `/actuator/metrics`, `/actuator/prometheus`
+- SpringDoc OpenAPI UI at `http://localhost:8026/swagger-ui.html`
 
-## 🛠 Technology Stack
+## Hybrid ranking algorithm
 
-### Backend
-- **Java 21** with Spring Boot 3.4.2
-- **Spring Data JPA** with PostgreSQL
-- **Spring Data Elasticsearch** for product search
-- **Spring Data Redis** for caching and user preferences
-- **Spring Kafka** for real-time product updates
-- **Spring Boot Validation** for input validation
-- **SpringDoc OpenAPI** for API documentation
-- **Micrometer Prometheus** for metrics
+Final score = **0.35** × social + **0.25** × collaborative + **0.20** × content + **0.15** × trending + **0.05** × freshness
 
-### Frontend
-- **React 18** with modern hooks
-- **Tailwind CSS** for styling
-- **Axios** for API communication
-- **Lucide React** for icons
+Weights are configurable in `application.properties` under `recommendation.feed.weights.*` — designed for A/B experimentation without rebuilding.
 
-### Infrastructure
-- **Docker** with multi-stage builds
-- **Kubernetes** with Kustomize overlays
-- **GitHub Actions** for CI/CD
-- **H2** for testing
+Additional guards:
+- **Freshness decay**: exponential `exp(-λ·ageHours)`, half-life ≈ 48 h
+- **Diversity guard**: max 2 posts per author per page
+- **Negative signals**: posts from muted users excluded (`social:{userId}:muted` Redis set)
 
-## ⚠️ Notes about this repository
+## Technology stack
 
-- There is **no** `docker-compose.yml` in this repo by design. For local runs you can use your own infra (PostgreSQL/Redis/Elasticsearch/Kafka) or Kubernetes.
-- There are **two UI options**:
-  - `frontend/` — React app (recommended for development)
-  - `src/main/resources/static/index.html` — built-in static page served by Spring Boot (no build step)
+| Layer | Tech |
+|---|---|
+| Runtime | Java 21, Spring Boot 3.4.2 |
+| Web | Spring MVC (servlet-based, non-reactive) |
+| Search | Spring Data Elasticsearch 5.x, kNN vector search |
+| Cache | Spring Data Redis (user preferences, social graph, interest embeddings) |
+| Messaging | Apache Kafka (`train.completed`, `training.created`) |
+| AI | Spring AI 1.0.0-M6 — OpenAI `text-embedding-ada-002` + `gpt-4o-mini` |
+| Service discovery | Spring Cloud Eureka client |
+| Docs | SpringDoc OpenAPI (webmvc-ui) |
+| Metrics | Micrometer + Prometheus |
+| Frontend | React 18, Tailwind CSS, Axios |
+| Infra | Docker (multi-stage, non-root), Kubernetes + Kustomize, GitHub Actions |
 
-## 📡 API Documentation
+## Redis key schema
 
-### Base URL
-- Development: `http://localhost:8026`
-- Production: `https://api.recommendation-service.com`
+| Key | Type | Description |
+|---|---|---|
+| `user:{id}:fav_category` | String | Top category for quick personalization |
+| `user:{id}:category_preferences` | Hash | `category → score` and `tag:{tag} → score` |
+| `user:{id}:interest_embedding` | Binary | EMA float[1536] of last liked/saved post embeddings |
+| `social:{id}:following` | Set | UserIds this user follows |
+| `social:{id}:followers` | Set | UserIds that follow this user |
+| `social:{id}:muted` | Set | Muted userIds (negative signal) |
 
-### Endpoints
+## Elasticsearch indices
 
-#### Recommendations
-- `GET /api/recommendations/{userId}` - Get personalized recommendations
-- `GET /api/recommendations/popular` - Get popular products
-- `GET /api/recommendations/{userId}/collaborative` - Collaborative filtering recommendations
-- `GET /api/recommendations/{userId}/content-based` - Content-based recommendations
-- `GET /api/recommendations/trending` - Get trending products
+| Index | Document | Purpose |
+|---|---|---|
+| `posts` | `PostDoc` | Post content + 1536-dim embedding |
+| `post_actions` | `PostAction` | Interaction log with timestamp (for trending window) |
 
-#### User Actions
-- `POST /api/user-actions` - Track user interaction
-- `GET /api/user-actions/{userId}/history` - Get user action history
+## Kafka topics consumed
 
-#### Documentation
-- `GET /swagger-ui.html` - Interactive API documentation
-- `GET /v3/api-docs` - OpenAPI specification
+| Topic | Action |
+|---|---|
+| `train.completed` | Auto-generates a `WORKOUT_COMPLETED` post |
+| `training.created` | Auto-generates a `TIP` post (if text is present) |
 
-### Example Requests
+> **Extension point**: add `nutrition.logged` listener in `TrainingEventConsumer` to auto-generate `MEAL_LOG` posts from Training-Nutrition events.
 
-```bash
-# Get personalized recommendations
-curl "http://localhost:8026/api/recommendations/user1?page=0&size=10"
-
-# Get popular products
-curl "http://localhost:8026/api/recommendations/popular?limit=20"
-
-# Track user action
-curl -X POST "http://localhost:8026/api/user-actions" \
-  -H "Content-Type: application/json" \
-  -d '{"userId":"user1","productId":"123","actionType":"view"}'
-```
-
-## 🚀 Quick Start
-
-### Prerequisites
-- **Java 21+** and Maven
-- **Node.js 16+** and npm (for frontend)
-- One of the following:
-  - local infrastructure (PostgreSQL, Elasticsearch, Redis, Kafka)
-  - Kubernetes cluster (see `k8s/`)
-
-### 1. Start Backend Service
-```bash
-./mvnw spring-boot:run
-```
-
-### 2. Start React Frontend (New Terminal)
-```bash
-cd frontend
-npm install
-npm start
-```
-
-### 3. Access
-- **React frontend**: `http://localhost:3000`
-- **Backend API**: `http://localhost:8026`
-- **OpenAPI UI**: `http://localhost:8026/swagger-ui.html`
-- **Static built-in UI**: `http://localhost:8026/`
-
-## 🧪 Testing
-
-### Run Backend Tests
-```bash
-./mvnw test
-```
-
-### Run Frontend Tests
-```bash
-cd frontend
-npm test
-```
-
-### Test Coverage
-- Unit tests for all service layers
-- Integration tests for API endpoints
-- Controller tests with MockMvc
-- Frontend component tests
-
-## 📦 Deployment
-
-### Docker Build
-```bash
-docker build -t recommendation-service:latest .
-```
-
-### Kubernetes Deployment
-```bash
-# Deploy to staging
-kubectl apply -k k8s/overlays/staging
-
-# Deploy to production
-kubectl apply -k k8s/overlays/production
-```
-
-### Environment Variables
-- `SPRING_DATASOURCE_URL` - PostgreSQL connection
-- `SPRING_ELASTICSEARCH_URIS` - Elasticsearch nodes
-- `SPRING_DATA_REDIS_HOST` - Redis server
-- `SPRING_KAFKA_BOOTSTRAP_SERVERS` - Kafka brokers
-- `EUREKA_SERVER_URL` - Service discovery
-
-## 📊 Monitoring
-
-### Health Endpoints
-- `/actuator/health` - Overall health
-- `/actuator/health/liveness` - Liveness probe
-- `/actuator/health/readiness` - Readiness probe
-
-### Metrics
-- `/actuator/prometheus` - Prometheus metrics
-- `/actuator/metrics` - Spring Boot metrics
-
-### Key Metrics
-- Request duration and count
-- Recommendation generation time
-- Cache hit rates
-- Database connection pool status
-
-## 🔧 Configuration
-
-### Profiles
-- `dev` - Development with H2 database
-- `default` - Production-ready configuration
-- `test` - Testing configuration
-
-### Caching Strategy
-- **Redis**: User preferences and session data
-- **Application Cache**: Popular products (TTL: 5 minutes)
-- **Elasticsearch**: Product search and aggregations
-
-### Recommendation Algorithms
-1. **Category-based**: User's favorite categories from Redis
-2. **Collaborative**: Similar users' behavior patterns
-3. **Content-based**: Category preference matching
-4. **Trending**: Recent activity analysis
-
-## 🛡 Security
-
-### Implemented Measures
-- **CORS**: Configured for specific origins
-- **Input Validation**: Bean validation on all inputs
-- **Rate Limiting**: Configurable request limits
-- **Error Handling**: Sanitized error responses
-
-### Best Practices
-- No sensitive data in logs
-- Secure defaults for all configurations
-- Regular dependency updates
-- Security scanning in CI/CD
-
-## Локальный запуск
-
-Требования:
-
-- JDK 21+
-- Maven или Maven Wrapper
-- PostgreSQL
-- Elasticsearch
-- Redis
-- Kafka
-
-Команды:
+## Running locally
 
 ```bash
-./mvnw clean test
-./mvnw spring-boot:run
+# Backend (port 8026)
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+
+# Frontend (port 5000, proxies to :8026)
+cd frontend && npm install && npm start
 ```
 
-Сервис будет доступен по адресу:
+Requires: Elasticsearch, Redis, Kafka, PostgreSQL (see `docker-compose` or k8s overlays).
 
-```text
-http://localhost:8026
+## Configuration
+
+Key properties in `application.properties`:
+
+```properties
+recommendation.feed.weights.social=0.35
+recommendation.feed.weights.collaborative=0.25
+recommendation.feed.weights.content=0.20
+recommendation.feed.weights.trending=0.15
+recommendation.feed.weights.freshness=0.05
+
+spring.ai.openai.api-key=${OPENAI_API_KEY:}
+spring.ai.openai.chat.options.model=gpt-4o-mini
+spring.ai.openai.embedding.options.model=text-embedding-ada-002
 ```
 
-## Конфигурация через переменные окружения
-
-Основные runtime-параметры вынесены во внешние env vars:
-
-- `SPRING_DATASOURCE_URL`
-- `SPRING_DATASOURCE_USERNAME`
-- `SPRING_DATASOURCE_PASSWORD`
-- `SPRING_ELASTICSEARCH_URIS`
-- `SPRING_DATA_REDIS_HOST`
-- `SPRING_DATA_REDIS_PORT`
-- `SPRING_KAFKA_BOOTSTRAP_SERVERS`
-- `SPRING_KAFKA_CONSUMER_GROUP_ID`
-- `EUREKA_SERVER_URL`
-
-Это позволяет без перепаковки образа использовать разные конфигурации для staging и production.
-
-## Docker
-
-Контейнер собирается через multi-stage Dockerfile:
-
-- build stage использует Maven + Temurin 21
-- runtime stage использует Temurin 21 JRE Alpine
-- `mvnw` получает executable permission в контейнере
-- приложение запускается от non-root пользователя `spring`
-
-Сборка образа:
-
-```bash
-docker build -t recommendation-service:local .
-```
-
-## Kubernetes
-
-В репозитории добавлена структура `k8s/`:
-
-```text
-k8s/
-  base/
-    deployment.yaml
-    service.yaml
-    hpa.yaml
-    pdb.yaml
-    kustomization.yaml
-    secret.example.yaml
-  overlays/
-    staging/
-    production/
-```
-
-### Что уже предусмотрено
-
-- `Deployment` с rolling update стратегией
-- `Service`
-- `HorizontalPodAutoscaler`
-- `PodDisruptionBudget`
-- `Prometheus` annotations
-- `startupProbe`, `readinessProbe`, `livenessProbe`
-- отдельные overlays для `staging` и `production`
-- разные namespace для окружений
-- ingress для каждого окружения
-- внешний secret для чувствительных данных
-
-### Подготовка секретов
-
-В репозиторий добавлен шаблон:
-
-```text
-k8s/base/secret.example.yaml
-```
-
-Перед деплоем создай реальный secret на основе этого шаблона и не коммить его в репозиторий.
-
-Для pull из GHCR кластеру также понадобится `imagePullSecret` с именем `ghcr-pull-secret`.
-
-### Рендеринг manifests
-
-```bash
-kubectl kustomize k8s/overlays/staging
-kubectl kustomize k8s/overlays/production
-```
-
-### Деплой вручную
-
-```bash
-kubectl apply -k k8s/overlays/staging
-kubectl apply -k k8s/overlays/production
-```
-
-## CI/CD
-
-Workflow находится в:
-
-```text
-.github/workflows/main.yml
-```
-
-### Что делает pipeline
-
-1. Гоняет тесты на Java 21.
-2. Выполняет `clean verify` на основной версии Java 21.
-3. Рендерит Kubernetes overlays и валидирует их через `kubectl apply --dry-run=client`.
-4. Собирает Docker image.
-5. На `main` пушит image в GHCR с тегами:
-   - `latest`
-   - `${github.sha}`
-6. Деплоит staging через `kubectl apply -k`.
-7. После staging обновляет образ в deployment и ждет rollout.
-8. Затем тем же способом деплоит production.
-
-### Какие secrets нужны в GitHub Actions
-
-- `KUBE_CONFIG_STAGING` — base64 kubeconfig для staging-кластера
-- `KUBE_CONFIG_PRODUCTION` — base64 kubeconfig для production-кластера
-
-`GITHUB_TOKEN` используется для публикации образа в GHCR автоматически.
-Если `KUBE_CONFIG_STAGING` или `KUBE_CONFIG_PRODUCTION` не заданы, соответствующий deploy job будет автоматически пропущен, а build и publish этапы продолжат работать.
-
-## Health endpoints для Kubernetes
-
-Используются стандартные Spring Boot Actuator endpoints:
-
-- `/actuator/health/liveness`
-- `/actuator/health/readiness`
-- `/actuator/prometheus`
-
-## Проверка проекта
-
-Основная локальная проверка:
-
-```bash
-./mvnw -B -ntp clean test
-./mvnw -B -ntp clean verify -DskipTests
-```
-
-## Что важно помнить
-
-- Kubernetes manifests предполагают, что PostgreSQL, Kafka, Redis и Elasticsearch уже доступны в соответствующем окружении.
-- Хосты ingress в overlays заданы как шаблонные:
-  - `recommendation-staging.example.com`
-  - `recommendation.example.com`
-  Их нужно заменить на реальные домены.
-- Если планируется реальный production rollout, стоит добавить sealed secrets или внешний secret manager.
+> **Note**: The social graph is intentionally stored in Redis for simplicity.
+> At larger scale it should be extracted into a dedicated Social-Graph-Service (e.g. backed by Neo4j or PostgreSQL).

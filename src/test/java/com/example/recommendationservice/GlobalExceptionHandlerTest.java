@@ -10,35 +10,43 @@ import org.springframework.http.ResponseEntity;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class GlobalExceptionHandlerTest {
+class GlobalExceptionHandlerTest {
 
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
 
     @Test
-    void handleRedisException_ShouldReturn503(){
-        RedisConnectionFailureException ex = new RedisConnectionFailureException("Conn failed");
+    void handleRedisException_returns503() {
+        ResponseEntity<ErrorResponse> response =
+                handler.handleRedisException(new RedisConnectionFailureException("conn failed"));
 
-
-        ResponseEntity<ErrorResponse> response = handler.handleRedisException(ex);
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());
         assertEquals("Personalization data source error", response.getBody().getMessage());
     }
 
     @Test
-    void handleIllegalArgumentException_ShouldReturn400(){
-        ResponseEntity<ErrorResponse> response = handler.handleIllegalArgumentException(
-                new IllegalArgumentException("size must be between 1 and 100")
-        );
+    void handleIllegalArgument_returns400() {
+        ResponseEntity<ErrorResponse> response =
+                handler.handleIllegalArgument(new IllegalArgumentException("size must be between 1 and 100"));
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertEquals("size must be between 1 and 100", response.getBody().getMessage());
     }
 
     @Test
-    void handleElasticsearchException_ShouldReturn500(){
-        ResponseEntity<ErrorResponse> response = handler.handleElasticsearchException(new NoSuchIndexException("products"));
+    void handleElasticsearchException_returns500() {
+        ResponseEntity<ErrorResponse> response =
+                handler.handleElasticsearchException(new NoSuchIndexException("posts"));
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
         assertEquals("Search service is temporarily unavailable", response.getBody().getMessage());
+    }
+
+    @Test
+    void handleIllegalState_returns409() {
+        ResponseEntity<ErrorResponse> response =
+                handler.handleIllegalState(new IllegalStateException("conflict"));
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertEquals("conflict", response.getBody().getMessage());
     }
 }

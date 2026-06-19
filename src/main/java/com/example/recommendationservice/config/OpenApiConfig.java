@@ -18,22 +18,19 @@ public class OpenApiConfig {
         return new OpenAPI()
                 .info(new Info()
                         .title("Recommendation Service API")
-                        .description("A comprehensive recommendation service API that provides personalized product recommendations, popular products, and user action tracking. The service uses collaborative filtering, content-based filtering, and trending algorithms to deliver relevant product suggestions.")
-                        .version("1.0.0")
+                        .description("Personalized fitness post feed service. Provides hybrid-ranked feeds, " +
+                                "social graph management, post lifecycle, semantic (RAG) search, " +
+                                "and user-interaction tracking for the fitness app.")
+                        .version("2.0.0")
                         .contact(new Contact()
-                                .name("Recommendation Service Team")
-                                .email("support@recommendation-service.com")
-                                .url("https://recommendation-service.com"))
+                                .name("Fitness App Team")
+                                .email("support@fitness-app.example.com"))
                         .license(new License()
                                 .name("MIT License")
                                 .url("https://opensource.org/licenses/MIT")))
                 .servers(List.of(
-                        new Server()
-                                .url("http://localhost:8026")
-                                .description("Development server"),
-                        new Server()
-                                .url("https://api.recommendation-service.com")
-                                .description("Production server")
+                        new Server().url("http://localhost:8026").description("Development server"),
+                        new Server().url("https://api.fitness-app.example.com").description("Production server")
                 ));
     }
 }

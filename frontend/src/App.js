@@ -1,208 +1,250 @@
-import React, { useState, useEffect } from 'react';
-import { Search, User, TrendingUp, Package, Heart, ShoppingCart, Star } from 'lucide-react';
-import RecommendationService from './services/RecommendationService';
-import ProductCard from './components/ProductCard';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Activity, TrendingUp, Users, Search, X } from 'lucide-react';
+import FeedService from './services/FeedService';
+import PostCard from './components/PostCard';
 import UserSelector from './components/UserSelector';
 import LoadingSpinner from './components/LoadingSpinner';
 
-function App() {
-  const [user, setUser] = useState('user1');
-  const [recommendations, setRecommendations] = useState([]);
-  const [popularProducts, setPopularProducts] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+const TABS = [
+  { id: 'personalized', label: 'For You',    icon: Activity  },
+  { id: 'following',    label: 'Following',  icon: Users     },
+  { id: 'trending',     label: 'Trending',   icon: TrendingUp },
+];
+
+export default function App() {
+  const [userId,    setUserId]    = useState('user1');
   const [activeTab, setActiveTab] = useState('personalized');
-  const [page, setPage] = useState(0);
-  const [hasNext, setHasNext] = useState(false);
+  const [posts,     setPosts]     = useState([]);
+  const [page,      setPage]      = useState(0);
+  const [hasNext,   setHasNext]   = useState(false);
+  const [loading,   setLoading]   = useState(false);
+  const [error,     setError]     = useState(null);
 
-  useEffect(() => {
-    loadRecommendations();
-  }, [user, page]);
+  // Search state
+  const [searchOpen,  setSearchOpen]  = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResult, setSearchResult] = useState(null);
+  const [searching,   setSearching]   = useState(false);
 
-  useEffect(() => {
-    if (activeTab === 'popular') {
-      loadPopularProducts();
-    }
-  }, [activeTab]);
-
-  const loadRecommendations = async () => {
+  const loadFeed = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await RecommendationService.getRecommendations(user, page, 10);
-      setRecommendations(response.products);
-      setHasNext(response.hasNext);
+      let data;
+      if (activeTab === 'personalized') {
+        data = await FeedService.getPersonalizedFeed(userId, page, 10);
+        setPosts(data.posts || []);
+        setHasNext(data.hasNext || false);
+      } else if (activeTab === 'following') {
+        data = await FeedService.getFollowingFeed(userId, page, 20);
+        setPosts(data.posts || []);
+        setHasNext(data.hasNext || false);
+      } else {
+        const trending = await FeedService.getTrendingPosts(20);
+        // Wrap plain PostDoc array as RankedPost for uniform rendering
+        setPosts((trending || []).map(p => ({ post: p, score: 0 })));
+        setHasNext(false);
+      }
     } catch (err) {
-      setError('Failed to load recommendations. Please try again.');
-      console.error('Error loading recommendations:', err);
+      setError('Could not load feed. Is the backend running?');
+      console.error(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId, activeTab, page]);
 
-  const loadPopularProducts = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const products = await RecommendationService.getPopularProducts(20);
-      setPopularProducts(products);
-    } catch (err) {
-      setError('Failed to load popular products. Please try again.');
-      console.error('Error loading popular products:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => { loadFeed(); }, [loadFeed]);
 
-  const handleUserChange = (newUser) => {
-    setUser(newUser);
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
     setPage(0);
+    setPosts([]);
+    setSearchResult(null);
   };
 
-  const handleNextPage = () => {
-    if (hasNext) {
-      setPage(page + 1);
+  const handleUserChange = (id) => {
+    setUserId(id);
+    setPage(0);
+    setPosts([]);
+    setSearchResult(null);
+  };
+
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    setSearching(true);
+    setError(null);
+    try {
+      const result = await FeedService.searchPosts(userId, searchQuery);
+      setSearchResult(result);
+    } catch (err) {
+      setError('Search failed. Please try again.');
+    } finally {
+      setSearching(false);
     }
   };
 
-  const handlePrevPage = () => {
-    if (page > 0) {
-      setPage(page - 1);
-    }
-  };
+  // Normalise: both /trending (PostDoc[]) and /feed (RankedPost[]) come through as RankedPost
+  const displayPosts = searchResult
+    ? (searchResult.posts || []).map(p => ({ post: p, score: 0 }))
+    : posts;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* Header */}
-      <header className="bg-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Package className="w-8 h-8 text-blue-600" />
-              <h1 className="text-3xl font-bold text-gray-900">Recommendation Service</h1>
-            </div>
-            <UserSelector 
-              selectedUser={user} 
-              onUserChange={handleUserChange} 
-            />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50">
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <header className="bg-white shadow-sm sticky top-0 z-10">
+        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Activity className="w-7 h-7 text-indigo-600" aria-hidden="true" />
+            <h1 className="text-xl font-bold text-gray-900">FitFeed</h1>
+          </div>
+
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setSearchOpen(v => !v)}
+              className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+              aria-label="Toggle search"
+            >
+              <Search className="w-5 h-5" />
+            </button>
+            <UserSelector selectedUser={userId} onUserChange={handleUserChange} />
           </div>
         </div>
+
+        {/* Search bar */}
+        {searchOpen && (
+          <div className="border-t border-gray-100 bg-white px-4 py-3">
+            <form onSubmit={handleSearch} className="flex space-x-2">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search posts by topic, e.g. 'leg day tips'…"
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                aria-label="Search query"
+              />
+              <button
+                type="submit"
+                disabled={searching}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-indigo-700 transition-colors"
+              >
+                {searching ? '…' : 'Search'}
+              </button>
+              {searchResult && (
+                <button
+                  type="button"
+                  onClick={() => { setSearchResult(null); setSearchQuery(''); }}
+                  className="p-2 text-gray-500 hover:text-gray-700"
+                  aria-label="Clear search"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </form>
+            {searchResult?.aiExplanation && (
+              <p className="mt-2 text-xs text-indigo-700 bg-indigo-50 rounded-lg px-3 py-2">
+                🤖 {searchResult.aiExplanation}
+              </p>
+            )}
+          </div>
+        )}
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Tab Navigation */}
-        <div className="bg-white rounded-lg shadow-md mb-8">
-          <div className="border-b border-gray-200">
-            <nav className="flex -mb-px">
+      {/* ── Tab bar ────────────────────────────────────────────────────── */}
+      {!searchResult && (
+        <nav className="bg-white border-b border-gray-100 sticky top-[72px] z-10" aria-label="Feed tabs">
+          <div className="max-w-3xl mx-auto px-4 flex">
+            {TABS.map(({ id, label, icon: Icon }) => (
               <button
-                onClick={() => setActiveTab('personalized')}
-                className={`py-4 px-6 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'personalized'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                key={id}
+                onClick={() => handleTabChange(id)}
+                className={`flex items-center space-x-1.5 py-3 px-5 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === id
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
+                aria-selected={activeTab === id}
+                role="tab"
               >
-                <div className="flex items-center space-x-2">
-                  <User className="w-4 h-4" />
-                  <span>Personalized for {user}</span>
-                </div>
+                <Icon className="w-4 h-4" aria-hidden="true" />
+                <span>{label}</span>
               </button>
-              <button
-                onClick={() => setActiveTab('popular')}
-                className={`py-4 px-6 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'popular'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-center space-x-2">
-                  <TrendingUp className="w-4 h-4" />
-                  <span>Popular Products</span>
-                </div>
-              </button>
-            </nav>
+            ))}
           </div>
-        </div>
+        </nav>
+      )}
 
-        {/* Error Message */}
-        {error && (
-          <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
-            <div className="flex">
-              <div className="ml-3">
-                <p className="text-sm text-red-700">{error}</p>
-              </div>
-            </div>
+      {/* ── Main ───────────────────────────────────────────────────────── */}
+      <main className="max-w-3xl mx-auto px-4 py-6">
+        {/* Search heading */}
+        {searchResult && (
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-800">
+              Search results for "{searchQuery}"
+            </h2>
+            <button
+              onClick={() => { setSearchResult(null); setSearchQuery(''); }}
+              className="text-sm text-indigo-600 hover:underline"
+            >
+              Back to feed
+            </button>
           </div>
         )}
 
-        {/* Loading State */}
-        {loading && <LoadingSpinner />}
+        {/* Error */}
+        {error && (
+          <div role="alert" className="bg-red-50 border-l-4 border-red-400 p-4 mb-4 rounded-r-lg text-sm text-red-700">
+            {error}
+          </div>
+        )}
 
-        {/* Content */}
-        {!loading && (
-          <div>
-            {activeTab === 'personalized' ? (
-              <div>
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-semibold text-gray-800">
-                    Recommended for {user}
-                  </h2>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={handlePrevPage}
-                      disabled={page === 0}
-                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 transition-colors"
-                    >
-                      Previous
-                    </button>
-                    <span className="text-gray-600">
-                      Page {page + 1}
-                    </span>
-                    <button
-                      onClick={handleNextPage}
-                      disabled={!hasNext}
-                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 transition-colors"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {recommendations.map((product) => (
-                    <ProductCard key={product.id} product={product} />
-                  ))}
-                </div>
-                {recommendations.length === 0 && (
-                  <div className="text-center py-12">
-                    <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500 text-lg">No recommendations available</p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div>
-                <h2 className="text-2xl font-semibold text-gray-800 mb-6">
-                  Popular Products
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {popularProducts.map((product) => (
-                    <ProductCard key={product.id} product={product} />
-                  ))}
-                </div>
-                {popularProducts.length === 0 && (
-                  <div className="text-center py-12">
-                    <TrendingUp className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500 text-lg">No popular products available</p>
-                  </div>
-                )}
+        {/* Loading */}
+        {(loading || searching) && <LoadingSpinner />}
+
+        {/* Posts */}
+        {!loading && !searching && (
+          <>
+            <div className="space-y-4">
+              {displayPosts.map(({ post }) => (
+                <PostCard key={post.id} post={post} currentUserId={userId} />
+              ))}
+            </div>
+
+            {displayPosts.length === 0 && (
+              <div className="text-center py-16 text-gray-400">
+                <Activity className="w-12 h-12 mx-auto mb-3 opacity-40" />
+                <p className="text-lg">No posts yet</p>
+                <p className="text-sm mt-1">
+                  {activeTab === 'following'
+                    ? 'Follow some users to see their posts here.'
+                    : 'Check back soon for fresh content.'}
+                </p>
               </div>
             )}
-          </div>
+
+            {/* Pagination — only for paginated tabs */}
+            {!searchResult && activeTab !== 'trending' && (
+              <div className="flex justify-center items-center space-x-4 mt-8">
+                <button
+                  onClick={() => setPage(p => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm disabled:opacity-40 hover:bg-gray-50 transition-colors"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-gray-600">Page {page + 1}</span>
+                <button
+                  onClick={() => setPage(p => p + 1)}
+                  disabled={!hasNext}
+                  className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm disabled:opacity-40 hover:bg-gray-50 transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>
   );
 }
-
-export default App;
