@@ -1,193 +1,229 @@
-# Recommendation Service
+# 🤖 Recommendation Service
 
-Personalized fitness post feed microservice — part of a Spring Boot 3.4.2 / Java 21 fitness app.
+AI-сервис персонализированных рекомендаций фитнес-платформы [FitFlow](https://github.com/Maru3022/project-hub) — гибридная лента (collaborative + content-based + social + trending), социальный граф и семантический поиск на векторных embeddings с RAG-объяснением результатов.
 
-A production-ready recommendation engine that provides personalized content feeds using hybrid ranking algorithms combining collaborative filtering, content-based recommendations, social signals, and trending analysis.
+[![Java](https://img.shields.io/badge/Java-21-orange?logo=openjdk)](.)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.2-brightgreen?logo=spring)](.)
+[![Spring AI](https://img.shields.io/badge/Spring%20AI-OpenAI-412991?logo=openai)](.)
+[![Elasticsearch](https://img.shields.io/badge/Elasticsearch-kNN%20vector%20search-005571?logo=elasticsearch)](.)
+[![Redis](https://img.shields.io/badge/Redis-Cache-DC382D?logo=redis)](.)
+[![Observability](https://img.shields.io/badge/Observability-Prometheus%20%2B%20Grafana%20%2B%20Loki-F46800?logo=grafana)](.)
+[![CI/CD](https://img.shields.io/badge/CI%2FCD-OWASP%20%2B%20SBOM%20%2B%20Trivy-2088FF?logo=githubactions)](.)
 
-## Features
+---
 
-### Feed API (`/api/v1/feed`)
-| Endpoint | Description |
-|---|---|
-| `GET /api/v1/feed/personalized?userId=&page=&size=` | **Hybrid-ranked personal feed** — blends social, collaborative, content-based, trending, and freshness signals |
-| `GET /api/v1/feed/following?userId=&page=&size=` | Chronological feed from followed users only |
-| `GET /api/v1/feed/trending?page=&size=` | Global trending posts (72-hour interaction window) |
-| `GET /api/v1/feed/collaborative?userId=&limit=` | Collaborative filtering recommendations using kNN |
-| `GET /api/v1/feed/content-based?userId=&limit=` | Content-based recommendations using semantic search |
-| `GET /api/v1/feed/social?userId=&limit=` | Posts from followed users |
-| `POST /api/v1/feed/action` | Record user action (VIEW/LIKE/COMMENT/SHARE/SAVE) |
-| `POST /api/v1/feed/invalidate?userId=` | Invalidate feed cache for user |
+## Что делает сервис
 
-### Post API (`/api/v1/posts`)
-| Endpoint | Description |
-|---|---|
-| `POST /api/v1/posts` | Create post |
-| `GET /api/v1/posts/{postId}` | Get post by ID |
-| `GET /api/v1/posts/author/{authorId}` | Get posts by author |
-| `DELETE /api/v1/posts/{postId}` | Delete post (author-only) |
-| `POST /api/v1/posts/{postId}/actions` | Track action — VIEW / LIKE / COMMENT / SHARE / SAVE / HIDE / REPORT |
-| `GET /api/v1/posts/{userId}/history` | User action history |
+Не «ещё один список постов по дате создания», а полноценный recommendation-движок:
 
-### Social Graph API (`/api/v1/social`)
-| Endpoint | Description |
-|---|---|
-| `POST /api/v1/social/{userId}/follow/{targetId}` | Follow a user |
-| `DELETE /api/v1/social/{userId}/follow/{targetId}` | Unfollow |
-| `GET /api/v1/social/{userId}/following` | Who userId follows |
-| `GET /api/v1/social/{userId}/followers` | Who follows userId |
+- **Гибридная персональная лента** — финальный скор поста собирается из четырёх независимых источников кандидатов с настраиваемыми весами.
+- **Семантический поиск (RAG)** — свободный текстовый запрос превращается в вектор, ищется kNN-поиском в Elasticsearch, а GPT объясняет, почему результат релевантен.
+- **Социальный граф** — подписки/подписчики, лента «только от тех, кого я читаю».
+- **Трендовый раздел** — глобально популярные посты за скользящее окно, с фоновым пересчётом и кэшированием в Redis.
+- **Учёт интересов в реальном времени** — действия пользователя (лайк/коммент/шер/сохранение) обновляют его embedding интересов через экспоненциальное скользящее среднее (EMA), без переобучения модели.
 
-### Semantic Search API (`/api/v1/semantic`)
-| Endpoint | Description |
-|---|---|
-| `POST /api/v1/semantic/search` | Semantic search using vector embeddings and AI explanations |
+## Гибридный алгоритм ранжирования
 
-### Observability
-- `GET /actuator/health`, `/actuator/metrics`, `/actuator/prometheus`
-- SpringDoc OpenAPI UI at `http://localhost:8026/swagger-ui.html`
-- **Grafana logs & metrics**: `docker compose up -d` → http://localhost:3000 (`admin` / `admin`) — see [docs/observability.md](docs/observability.md)
-
-## Hybrid ranking algorithm
-
-Final score = **0.35** × social + **0.25** × collaborative + **0.20** × content + **0.15** × trending + **0.05** × freshness
-
-Weights are configurable in `application.properties` under `recommendation.feed.weights.*` — designed for A/B experimentation without rebuilding.
-
-Additional guards:
-- **Freshness decay**: exponential `exp(-λ·ageHours)`, half-life ≈ 48 h
-- **Diversity guard**: max 2 posts per author per page
-- **Negative signals**: posts from muted users excluded (`social:{userId}:muted` Redis set)
-
-## Technology stack
-
-| Layer | Tech |
-|---|---|
-| Runtime | Java 21, Spring Boot 3.4.2 |
-| Web | Spring MVC (servlet-based, non-reactive) |
-| Search | Spring Data Elasticsearch 5.x, kNN vector search |
-| Cache | Spring Data Redis (user preferences, social graph, interest embeddings) |
-| Messaging | Apache Kafka (`train.completed`, `training.created`) |
-| AI | Spring AI 1.0.0-M6 — OpenAI `text-embedding-ada-002` + `gpt-4o-mini` |
-| Service discovery | Spring Cloud Eureka client |
-| Docs | SpringDoc OpenAPI (webmvc-ui) |
-| Metrics | Micrometer + Prometheus |
-| Frontend | React 18, Tailwind CSS, Axios |
-| Infra | Docker (multi-stage, non-root), Kubernetes + Kustomize, GitHub Actions |
-
-## Redis key schema
-
-| Key | Type | Description |
-|---|---|---|
-| `user:{id}:fav_category` | String | Top category for quick personalization |
-| `user:{id}:category_preferences` | Hash | `category → score` and `tag:{tag} → score` |
-| `user:{id}:interest_embedding` | Binary | EMA float[1536] of last liked/saved post embeddings |
-| `social:{id}:following` | Set | UserIds this user follows |
-| `social:{id}:followers` | Set | UserIds that follow this user |
-| `social:{id}:muted` | Set | Muted userIds (negative signal) |
-| `feed:userId:page:N` | String | Cached feed results with 10-min TTL |
-| `trending:posts` | ZSet | Trending posts with engagement scores |
-| `similar_users:userId` | String | Cached similar users list |
-
-## Elasticsearch indices
-
-| Index | Document | Purpose |
-|---|---|---|
-| `posts` | `PostDoc` | Post content + 1536-dim embedding |
-| `post_actions` | `PostAction` | Interaction log with timestamp (for trending window) |
-| `user_profiles` | `UserProfileDoc` | User interest embedding for kNN similarity search |
-
-## Kafka topics consumed
-
-| Topic | Action |
-|---|---|
-| `train.completed` | Auto-generates a `WORKOUT_COMPLETED` post |
-| `training.created` | Auto-generates a `TIP` post (if text is present) |
-
-> **Extension point**: add `nutrition.logged` listener in `TrainingEventConsumer` to auto-generate `MEAL_LOG` posts from Training-Nutrition events.
-
-## Running locally
-
-```bash
-# Backend (port 8026)
-./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
-
-# Frontend (port 5000, proxies to :8026)
-cd frontend && npm install && npm start
+```
+score = 0.35 × social + 0.25 × collaborative + 0.20 × content + 0.15 × trending + 0.05 × freshness
 ```
 
-Requires: Elasticsearch, Redis, Kafka, PostgreSQL — start everything with Docker Compose:
+| Источник | Как считается |
+|---|---|
+| **Social** | посты от тех, на кого подписан пользователь |
+| **Collaborative** | kNN по похожим пользователям (схожесть профилей, кэш в Redis на 6 часов) |
+| **Content-based** | косинусная близость embedding-вектора поста к вектору интересов пользователя |
+| **Trending** | engagement-score (лайки/комменты/сохранения/шеры) за скользящее окно **72 часа** |
+| **Freshness** | экспоненциальное затухание по возрасту поста, half-life ≈ **48 часов** |
+
+Кандидаты собираются параллельно из всех источников, дедуплицируются, после чего применяется:
+- **diversity guard** — не больше **2 постов одного автора** на страницу выдачи;
+- **negative signals** — посты от заглушенных (`muted`) пользователей исключаются ещё на этапе кандидатов.
+
+Все веса и пороги — не захардкожены, а вынесены в конфиг (`recommendation.feed.weights.*`, `recommendation.feed.trending-window-hours`, `recommendation.feed.freshness-half-life-hours`...) — ранжирование можно A/B-тестировать без пересборки приложения.
+
+## AI / RAG семантический поиск
+
+```
+Текстовый запрос
+      │
+      ▼
+EmbeddingService → OpenAI text-embedding-ada-002 (1536-dim вектор)
+      │
+      ▼
+Elasticsearch kNN-поиск по полю posts.embedding
+      │  (если kNN не дал результатов)
+      ▼
+Fallback: multi_match по text / tags / category
+      │
+      ▼
+GPT-4o-mini объясняет, почему каждый пост релевантен запросу
+```
+
+Тот же `EmbeddingService` считает векторы и для интересов пользователя: при каждом значимом действии (like/save/share) embedding профиля обновляется через EMA (`recommendation.action.interest-embedding-alpha-percent`) — это и есть источник вектора для content-based кандидатов, без отдельного ML-пайплайна обучения.
+
+## API
+
+### Feed API (`/api/v1/feed`)
+
+| Method | Endpoint | Описание |
+|---|---|---|
+| `GET` | `/feed/personalized?userId=&page=&size=` | Гибридная персональная лента (все 5 сигналов) |
+| `GET` | `/feed/following?userId=&page=&size=` | Хронологическая лента только от подписок |
+| `GET` | `/feed/trending?page=&size=` | Глобальные трендовые посты (окно 72 часа) |
+| `GET` | `/feed/collaborative?userId=&limit=` | Только collaborative-filtering кандидаты |
+| `GET` | `/feed/content-based?userId=&limit=` | Только content-based кандидаты (семантическая близость) |
+| `GET` | `/feed/social?userId=&limit=` | Только посты от подписок |
+| `POST` | `/feed/action` | Зафиксировать действие пользователя (VIEW/LIKE/COMMENT/SHARE/SAVE) |
+| `POST` | `/feed/invalidate?userId=` | Сбросить кэш ленты пользователя |
+
+### Post API (`/api/v1/posts`)
+
+| Method | Endpoint | Описание |
+|---|---|---|
+| `POST` | `/posts` | Создать пост |
+| `GET` | `/posts/{postId}` | Получить пост по id |
+| `GET` | `/posts/author/{authorId}` | Посты конкретного автора |
+| `DELETE` | `/posts/{postId}` | Удалить пост (только автор) |
+| `POST` | `/posts/{postId}/actions` | Зафиксировать действие (VIEW/LIKE/COMMENT/SHARE/SAVE/HIDE/REPORT) |
+| `GET` | `/posts/{userId}/history` | История действий пользователя |
+
+### Social Graph API (`/api/v1/social`)
+
+| Method | Endpoint | Описание |
+|---|---|---|
+| `POST` | `/social/{userId}/follow/{targetId}` | Подписаться |
+| `DELETE` | `/social/{userId}/follow/{targetId}` | Отписаться |
+| `GET` | `/social/{userId}/following` | На кого подписан пользователь |
+| `GET` | `/social/{userId}/followers` | Кто подписан на пользователя |
+
+### Semantic Search API (`/api/v1/semantic`)
+
+| Method | Endpoint | Описание |
+|---|---|---|
+| `POST` | `/semantic/search` | Семантический поиск по векторным embeddings с AI-объяснением релевантности |
+
+### Технические эндпоинты
+
+| Endpoint | Описание |
+|---|---|
+| `/swagger-ui.html` | OpenAPI / Swagger UI |
+| `/actuator/health`, `/actuator/metrics`, `/actuator/prometheus` | Health-check и метрики |
+
+## Архитектура и интеграция с платформой
+
+```
+                              ┌──────────────────┐
+                              │   API Gateway      │
+                              └────────┬──────────┘
+                                       │ /api/recommendations/**
+                                       ▼
+                          ┌─────────────────────────┐       register      ┌────────────┐
+                          │  Recommendation Service   ├─────────────────────►   Eureka    │
+                          └────────────┬────────────┘                     └────────────┘
+                                       │
+          ┌─────────────┬──────────────┼───────────────┬────────────────┐
+          ▼             ▼              ▼               ▼                ▼
+     PostgreSQL      Redis          Elasticsearch   Apache Kafka     OpenAI API
+   (posts, actions  (similar_users, (posts + user   training.created (embeddings,
+    social graph)    trending,       embeddings,    → TrainingEventConsumer  GPT-4o-mini)
+                      feed cache)    kNN-индекс)
+```
+
+Сервис слушает доменные события других сервисов платформы (`TrainingEventConsumer` на топик `training.created`) — например, тренировки пользователя могут влиять на контентные рекомендации без прямого синхронного вызова Training Service.
+
+## Observability
+
+Самый насыщенный observability-стек в платформе — поднимается отдельным compose-файлом:
 
 ```bash
+docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
+```
+
+| Компонент | Назначение |
+|---|---|
+| **Prometheus** | сбор метрик (`/actuator/prometheus`) + готовые `alerts.yml` для Alertmanager |
+| **Grafana** | дашборды `recommendation-overview` (метрики) и `recommendation-logs` (логи), `admin`/`admin` на `localhost:3000` |
+| **Loki + Promtail** | централизованный сбор и индексация логов контейнеров |
+| **Correlation-id** | сквозной `CorrelationIdFilter` — один запрос можно протрассировать от лога до лога через все сервисы |
+
+## DevSecOps в CI/CD
+
+Pipeline на GitHub Actions (~460 строк) — самый требовательный в платформе:
+
+| Этап | Что делает |
+|---|---|
+| **Tests** | юнит- и интеграционные тесты на нескольких версиях JDK, с покрытием |
+| **OWASP Dependency-Check** | аудит уязвимостей Maven-зависимостей, с кэшированием базы CVE |
+| **SBOM (CycloneDX)** | генерация Software Bill of Materials для образа |
+| **Kubernetes Validate** | рендер Kustomize-оверлеев (staging/production) + валидация через `kubeconform` **до** деплоя |
+| **Docker Build & Push** | multi-stage сборка, скан образа, публикация в GHCR |
+| **Deploy to Staging** | автоматический деплой по прохождении всех проверок |
+
+## Технологический стек
+
+| Категория | Технологии |
+|---|---|
+| Язык / Framework | Java 21, Spring Boot 3.4.2 |
+| AI / ML | Spring AI, OpenAI Embeddings (`text-embedding-ada-002`, 1536-dim), GPT-4o-mini |
+| Поиск | Elasticsearch (kNN vector search + full-text fallback) |
+| Данные | Spring Data JPA, PostgreSQL, HikariCP |
+| Кэш | Redis (похожие пользователи, trending, кэш ленты) |
+| Messaging | Spring Kafka (consumer доменных событий платформы) |
+| Отказоустойчивость | Resilience4j (circuit breaker) |
+| Service Discovery | Netflix Eureka Client |
+| Observability | Prometheus, Grafana, Loki, Promtail, structured JSON logging (Logstash encoder) |
+| Тестирование | JUnit 5, Mockito, integration-тесты (20 тестовых файлов) |
+| Безопасность | OWASP Dependency-Check, CycloneDX SBOM |
+| Контейнеризация / Deploy | Docker, Kubernetes + Kustomize (`base` / `overlays/staging` / `overlays/production`), HPA, PodDisruptionBudget |
+| Frontend (демо) | React + Tailwind CSS — лента, выбор пользователя, карточки постов |
+
+## Локальный запуск
+
+### Вариант 1 — всё через Docker Compose (рекомендуется)
+
+```bash
+git clone https://github.com/Maru3022/Recommendation-Service.git
+cd Recommendation-Service
+cp .env.example .env        # при желании укажите OPENAI_API_KEY для AI-функций
 docker compose up -d
 ```
 
-See [docs/observability.md](docs/observability.md) for Grafana log viewing. For Kubernetes, use the `k8s/` overlays.
-
-## Configuration
-
-Key properties in `application.properties`:
-
-```properties
-recommendation.feed.weights.social=0.35
-recommendation.feed.weights.collaborative=0.25
-recommendation.feed.weights.content=0.20
-recommendation.feed.weights.trending=0.15
-recommendation.feed.weights.freshness=0.05
-
-recommendation.feed.trending-window-hours=72
-recommendation.feed.freshness-half-life-hours=48
-recommendation.feed.knn-candidates-multiplier=10
-recommendation.feed.knn-min-candidates=50
-
-spring.ai.openai.api-key=${OPENAI_API_KEY:}
-spring.ai.openai.chat.options.model=gpt-4o-mini
-spring.ai.openai.embedding.options.model=text-embedding-ada-002
-```
-
-> **Note**: The social graph is intentionally stored in Redis for simplicity.
-> At larger scale it should be extracted into a dedicated Social-Graph-Service (e.g. backed by Neo4j or PostgreSQL).
-
-## Performance optimizations
-
-- **Elasticsearch kNN**: User similarity search uses vector similarity instead of batch cosine similarity computation (20ms vs minutes)
-- **Redis SCAN**: Cache invalidation uses non-blocking SCAN instead of KEYS command
-- **Connection pooling**: HikariCP for PostgreSQL, Lettuce pool for Redis
-- **Circuit breakers**: Resilience4j for Elasticsearch, Redis, and OpenAI API calls
-- **Caching**: Feed results cached in Redis with 10-minute TTL
-- **Batch operations**: JPA batch inserts/updates enabled
-- **Shared scoring logic**: Consolidated duplicate scoring into ScoringService
-
-## Testing
+Поднимутся PostgreSQL, Redis, Elasticsearch, Kafka и сам сервис. Проверка готовности:
 
 ```bash
-# Unit tests
-./mvnw test
-
-# Integration tests
-./mvnw verify -P integration-tests
-
-# Coverage report
-./mvnw verify
-# Report at target/site/jacoco/index.html
+docker compose ps
+curl http://localhost:8026/actuator/health
 ```
 
-The project maintains >50% code coverage with JaCoCo enforcement.
+С observability-стеком:
 
-## Recent improvements
+```bash
+docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
+```
 
-### Critical fixes
-1. **CF scaling**: Replaced batch-based cosine similarity with Elasticsearch kNN for user similarity search
-2. **JaCoCo coverage**: Added comprehensive tests to meet 50% instruction coverage requirement
-3. **Redis performance**: Replaced blocking KEYS command with non-blocking SCAN for cache invalidation
-4. **Code quality**: Consolidated duplicate scoring logic into shared ScoringService
+### Вариант 2 — локальная сборка
 
-### API enhancements
-- Added dedicated endpoints for different feed types (personalized, following, trending, collaborative, content-based, social)
-- Improved validation with Jakarta Bean Validation
-- Added comprehensive error handling
-- Enhanced DTOs with all necessary fields (sharesCount, savesCount)
+```bash
+./mvnw clean package -DskipTests
+java -jar target/recommendation-service-*.jar
+```
 
-### Architecture improvements
-- Created UserProfileDoc for Elasticsearch kNN user similarity
-- Created UserProfileSearchRepository for vector similarity queries
-- Unified scoring logic in ScoringService
-- Enhanced repository methods for better query capabilities
+| Что | Где |
+|---|---|
+| API | `http://localhost:8026` |
+| Swagger UI | `http://localhost:8026/swagger-ui.html` |
+| Grafana | `http://localhost:3000` (`admin`/`admin`) |
+| Frontend-демо | `cd frontend && npm install && npm start` |
+
+## Связанные репозитории
+
+Часть микросервисной платформы [FitFlow](https://github.com/Maru3022/project-hub):
+
+- [API Gateway](https://github.com/Maru3022/API_Gateway)
+- [Eureka Server](https://github.com/Maru3022/Eureka-server)
+- [Saga Orchestrator](https://github.com/Maru3022/Saga-Orchestrator)
+- [Training Service](https://github.com/Maru3022/Training-Servive)
+- [Trains Service](https://github.com/Maru3022/Trains-Service)
+- [Nutrition Service](https://github.com/Maru3022/Training-Nutrition)
+- [Notification Service](https://github.com/Maru3022/Training_Notification)
