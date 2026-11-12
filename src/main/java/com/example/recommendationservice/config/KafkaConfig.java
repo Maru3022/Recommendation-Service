@@ -2,6 +2,7 @@ package com.example.recommendationservice.config;
 
 import com.example.recommendationservice.dto.PostActionEvent;
 import com.example.recommendationservice.dto.PostCreatedEvent;
+import com.example.recommendationservice.dto.TrainingCreatedEvent;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -70,6 +71,20 @@ public class KafkaConfig {
         ConcurrentKafkaListenerContainerFactory<String, PostActionEvent> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(postActionConsumerFactory());
+        return factory;
+    }
+
+    @Bean
+    public ConsumerFactory<String, TrainingCreatedEvent> trainingCreatedConsumerFactory() {
+        return new DefaultKafkaConsumerFactory<>(consumerProps(), new StringDeserializer(),
+                new ErrorHandlingDeserializer<>(new JsonDeserializer<>(TrainingCreatedEvent.class, false)));
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, TrainingCreatedEvent> trainingCreatedKafkaListenerContainerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, TrainingCreatedEvent> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(trainingCreatedConsumerFactory());
         return factory;
     }
 

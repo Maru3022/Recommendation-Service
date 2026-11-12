@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/posts")
+@RequestMapping("/api/v1/posts")
 @Validated
 @RequiredArgsConstructor
 @Slf4j
@@ -44,7 +44,10 @@ public class PostController {
             @ApiResponse(responseCode = "400", description = "Validation error")
     })
     @PostMapping
-    public ResponseEntity<PostDoc> createPost(@Valid @RequestBody CreatePostRequest request) {
+    public ResponseEntity<PostDoc> createPost(
+            @RequestHeader("X-User-Id") String userId,
+            @Valid @RequestBody CreatePostRequest request) {
+        request.setAuthorId(userId);
         log.info("Create post | author={} type={}", request.getAuthorId(), request.getPostType());
         PostDoc post = postService.createPost(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(post);
@@ -75,7 +78,7 @@ public class PostController {
     @DeleteMapping("/{postId}")
     public ResponseEntity<Void> deletePost(
             @PathVariable @NotBlank @Size(max = 50) String postId,
-            @RequestParam @NotBlank String requestingUserId) {
+            @RequestHeader("X-User-Id") String requestingUserId) {
 
         boolean deleted = postService.deletePost(postId, requestingUserId);
         if (deleted) {
@@ -102,8 +105,9 @@ public class PostController {
     @PostMapping("/{postId}/actions")
     public ResponseEntity<PostAction> trackAction(
             @PathVariable @NotBlank @Size(max = 50) String postId,
+            @RequestHeader("X-User-Id") String userId,
             @Valid @RequestBody TrackActionRequest request) {
-
+        request.setUserId(userId);
         log.info("Track action | post={} user={} type={}", postId, request.getUserId(), request.getActionType());
         PostAction action = postActionService.trackAction(postId, request.getUserId(), request.getActionType());
         return ResponseEntity.ok(action);
@@ -113,9 +117,9 @@ public class PostController {
             summary = "Get user action history",
             description = "Returns all actions the user has performed on posts")
     @ApiResponse(responseCode = "200", description = "History returned")
-    @GetMapping("/{userId}/history")
+    @GetMapping("/history")
     public ResponseEntity<List<PostAction>> getUserHistory(
-            @PathVariable @NotBlank @Size(max = 50) String userId) {
+            @RequestHeader("X-User-Id") String userId) {
 
         log.info("Action history request | user={}", userId);
         return ResponseEntity.ok(postActionService.getUserActionHistory(userId));

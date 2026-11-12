@@ -44,7 +44,7 @@ public class FeedController {
     @GetMapping("/personalized")
     @Operation(summary = "Get personalized recommendation feed (hybrid approach)")
     public ResponseEntity<FeedResponse> getPersonalizedFeed(
-            @Parameter(description = "User ID") @RequestParam @NotBlank String userId,
+            @RequestHeader("X-User-Id") String userId,
             @Parameter(description = "Page number (0-based)") @RequestParam(defaultValue = "0") @Min(0) int page,
             @Parameter(description = "Page size") @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
             @Parameter(description = "Post IDs to exclude") @RequestParam(required = false) Set<String> excludePostIds
@@ -64,7 +64,7 @@ public class FeedController {
     @GetMapping("/following")
     @Operation(summary = "Get feed from followed users (chronological)")
     public ResponseEntity<FeedResponse> getFollowingFeed(
-            @Parameter(description = "User ID") @RequestParam @NotBlank String userId,
+            @RequestHeader("X-User-Id") String userId,
             @Parameter(description = "Page number (0-based)") @RequestParam(defaultValue = "0") @Min(0) int page,
             @Parameter(description = "Page size") @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
     ) {
@@ -100,7 +100,7 @@ public class FeedController {
     @GetMapping("/collaborative")
     @Operation(summary = "Get collaborative filtering recommendations")
     public ResponseEntity<FeedResponse> getCollaborativeFeed(
-            @Parameter(description = "User ID") @RequestParam @NotBlank String userId,
+            @RequestHeader("X-User-Id") String userId,
             @Parameter(description = "Limit") @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit,
             @Parameter(description = "Post IDs to exclude") @RequestParam(required = false) Set<String> excludePostIds
     ) {
@@ -123,7 +123,7 @@ public class FeedController {
     @GetMapping("/content-based")
     @Operation(summary = "Get content-based recommendations")
     public ResponseEntity<FeedResponse> getContentBasedFeed(
-            @Parameter(description = "User ID") @RequestParam @NotBlank String userId,
+            @RequestHeader("X-User-Id") String userId,
             @Parameter(description = "Limit") @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit,
             @Parameter(description = "Post IDs to exclude") @RequestParam(required = false) Set<String> excludePostIds
     ) {
@@ -146,7 +146,7 @@ public class FeedController {
     @GetMapping("/social")
     @Operation(summary = "Get posts from followed users")
     public ResponseEntity<FeedResponse> getSocialFeed(
-            @Parameter(description = "User ID") @RequestParam @NotBlank String userId,
+            @RequestHeader("X-User-Id") String userId,
             @Parameter(description = "Limit") @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit,
             @Parameter(description = "Post IDs to exclude") @RequestParam(required = false) Set<String> excludePostIds
     ) {
@@ -168,7 +168,10 @@ public class FeedController {
 
     @PostMapping("/action")
     @Operation(summary = "Record user action on a post")
-    public ResponseEntity<Void> recordAction(@RequestBody @Valid PostActionEvent event) {
+    public ResponseEntity<Void> recordAction(
+            @RequestHeader("X-User-Id") String userId,
+            @RequestBody @Valid PostActionEvent event) {
+        event.setUserId(userId);
         log.info("Recording action {} for user {} on post {}", event.getActionType(), event.getUserId(), event.getPostId());
         
         if (event.getTimestamp() == null) {
@@ -183,7 +186,7 @@ public class FeedController {
 
     @PostMapping("/invalidate")
     @Operation(summary = "Invalidate feed cache for user")
-    public ResponseEntity<Void> invalidateCache(@Parameter(description = "User ID") @RequestParam @NotBlank String userId) {
+    public ResponseEntity<Void> invalidateCache(@RequestHeader("X-User-Id") String userId) {
         log.info("Invalidating cache for user {}", userId);
         feedService.invalidateCache(userId);
         return ResponseEntity.noContent().build();
@@ -212,10 +215,16 @@ public class FeedController {
         return PostSummaryDto.builder()
                 .postId(post.getId())
                 .authorId(post.getAuthorId())
+                .authorDisplayName(post.getAuthorDisplayName())
+                .authorAvatarUrl(post.getAuthorAvatarUrl())
                 .text(post.getText())
                 .postType(post.getPostType())
                 .category(post.getCategory())
                 .tags(post.getTags())
+                .mediaUrls(post.getMediaUrls())
+                .relatedTrainingId(post.getRelatedTrainingId())
+                .durationMinutes(post.getDurationMinutes())
+                .caloriesBurned(post.getCaloriesBurned())
                 .likesCount(post.getLikesCount())
                 .commentsCount(post.getCommentsCount())
                 .sharesCount(post.getSharesCount())

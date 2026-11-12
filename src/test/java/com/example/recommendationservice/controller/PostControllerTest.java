@@ -54,7 +54,7 @@ class PostControllerTest {
 
         when(postService.createPost(any(CreatePostRequest.class))).thenReturn(testPost);
 
-        ResponseEntity<PostDoc> result = postController.createPost(request);
+        ResponseEntity<PostDoc> result = postController.createPost("author1", request);
 
         assertThat(result.getStatusCode().value()).isEqualTo(201);
         assertThat(result.getBody()).isNotNull();
@@ -109,7 +109,7 @@ class PostControllerTest {
                 .build();
         when(postActionService.trackAction("post1", "user1", "LIKE")).thenReturn(action);
 
-        ResponseEntity<PostAction> result = postController.trackAction("post1", request);
+        ResponseEntity<PostAction> result = postController.trackAction("post1", "user1", request);
 
         assertThat(result.getBody()).isNotNull();
         assertThat(result.getBody().getActionType()).isEqualTo(PostAction.ActionType.LIKE);

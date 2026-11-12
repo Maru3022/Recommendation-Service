@@ -22,7 +22,7 @@ import java.util.Set;
  * Social-Graph-Service when the scale requires it.</p>
  */
 @RestController
-@RequestMapping("/api/social")
+@RequestMapping("/api/v1/social")
 @Validated
 @RequiredArgsConstructor
 @Slf4j
@@ -37,9 +37,9 @@ public class SocialController {
             @ApiResponse(responseCode = "200", description = "Now following"),
             @ApiResponse(responseCode = "400", description = "Cannot follow self")
     })
-    @PostMapping("/{userId}/follow/{targetId}")
+    @PostMapping("/follow/{targetId}")
     public ResponseEntity<Void> follow(
-            @PathVariable @NotBlank @Size(max = 50) String userId,
+            @RequestHeader("X-User-Id") String userId,
             @PathVariable @NotBlank @Size(max = 50) String targetId) {
 
         log.info("Follow | {} → {}", userId, targetId);
@@ -49,9 +49,9 @@ public class SocialController {
 
     @Operation(summary = "Unfollow a user")
     @ApiResponse(responseCode = "204", description = "Unfollowed")
-    @DeleteMapping("/{userId}/follow/{targetId}")
+    @DeleteMapping("/follow/{targetId}")
     public ResponseEntity<Void> unfollow(
-            @PathVariable @NotBlank @Size(max = 50) String userId,
+            @RequestHeader("X-User-Id") String userId,
             @PathVariable @NotBlank @Size(max = 50) String targetId) {
 
         log.info("Unfollow | {} → {}", userId, targetId);
@@ -61,18 +61,18 @@ public class SocialController {
 
     @Operation(summary = "Get users that userId is following")
     @ApiResponse(responseCode = "200", description = "Following set returned")
-    @GetMapping("/{userId}/following")
+    @GetMapping("/following")
     public ResponseEntity<Set<String>> getFollowing(
-            @PathVariable @NotBlank @Size(max = 50) String userId) {
+            @RequestHeader("X-User-Id") String userId) {
 
         return ResponseEntity.ok(socialGraphService.getFollowing(userId));
     }
 
     @Operation(summary = "Get users that follow userId")
     @ApiResponse(responseCode = "200", description = "Followers set returned")
-    @GetMapping("/{userId}/followers")
+    @GetMapping("/followers")
     public ResponseEntity<Set<String>> getFollowers(
-            @PathVariable @NotBlank @Size(max = 50) String userId) {
+            @RequestHeader("X-User-Id") String userId) {
 
         return ResponseEntity.ok(socialGraphService.getFollowers(userId));
     }

@@ -15,10 +15,16 @@ import java.util.List;
 public class PostSummaryDto {
     private String postId;
     private String authorId;
+    private String authorDisplayName;
+    private String authorAvatarUrl;
     private String text;
     private String postType;
     private String category;
     private List<String> tags;
+    private List<String> mediaUrls;
+    private String relatedTrainingId;
+    private Double durationMinutes;
+    private Double caloriesBurned;
     private long likesCount;
     private long commentsCount;
     private long sharesCount;

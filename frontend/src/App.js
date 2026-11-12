@@ -1,250 +1,59 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Activity, TrendingUp, Users, Search, X } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Activity, Beef, CalendarDays, Dumbbell, Flame, LayoutDashboard, LogOut, Plus, RefreshCw, Salad, Sparkles, Users } from 'lucide-react';
+import { FitFlowApi, getStoredAuth, storeAuth } from './services/ApiClient';
 import FeedService from './services/FeedService';
 import PostCard from './components/PostCard';
-import UserSelector from './components/UserSelector';
-import LoadingSpinner from './components/LoadingSpinner';
 
-const TABS = [
-  { id: 'personalized', label: 'For You',    icon: Activity  },
-  { id: 'following',    label: 'Following',  icon: Users     },
-  { id: 'trending',     label: 'Trending',   icon: TrendingUp },
-];
+const today = () => new Date().toISOString().slice(0, 10);
+const localNow = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+const fields = { calories: 'Ккал', protein: 'Белки', carbs: 'Углеводы', fats: 'Жиры' };
 
+function ErrorBanner({ value, clear }) { return value ? <div className="alert" role="alert"><span>{value}</span><button onClick={clear}>×</button></div> : null; }
+
+function Auth({ done }) {
+  const [register, setRegister] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const [form, setForm] = useState({ login: '', username: '', email: '', fullName: '', password: '' });
+  const set = key => e => setForm({ ...form, [key]: e.target.value });
+  const submit = async e => { e.preventDefault(); setBusy(true); setError(''); try { done(register ? await FitFlowApi.register({ username: form.username, email: form.email, fullName: form.fullName, password: form.password }) : await FitFlowApi.login({ login: form.login, password: form.password })); } catch (x) { setError(x.message); } finally { setBusy(false); } };
+  return <main className="auth-shell"><section className="auth-brand"><div className="brand-mark"><Activity /></div><p className="eyebrow">ТРЕНИРУЙСЯ ОСОЗНАННО</p><h1>FitFlow</h1><p>Тренировки, питание и прогресс — в одном спокойном рабочем пространстве.</p><div className="brand-stats"><span><strong>8</strong> сервисов</span><span><strong>1</strong> профиль</span><span><strong>∞</strong> целей</span></div></section><section className="auth-card"><div className="auth-tabs"><button className={!register ? 'active' : ''} onClick={() => setRegister(false)}>Войти</button><button className={register ? 'active' : ''} onClick={() => setRegister(true)}>Регистрация</button></div><h2>{register ? 'Начнём движение' : 'С возвращением'}</h2><p>{register ? 'Создайте локальный профиль FitFlow.' : 'Введите логин или email и пароль.'}</p><ErrorBanner value={error} clear={() => setError('')} /><form className="form-stack" onSubmit={submit}>{register && <><label>Имя<input required minLength="2" value={form.fullName} onChange={set('fullName')} /></label><label>Логин<input required minLength="3" value={form.username} onChange={set('username')} /></label><label>Email<input required type="email" value={form.email} onChange={set('email')} /></label></>}{!register && <label>Логин или email<input required value={form.login} onChange={set('login')} /></label>}<label>Пароль<input required minLength="8" type="password" value={form.password} onChange={set('password')} /></label><button className="primary wide" disabled={busy}>{busy ? 'Подождите…' : register ? 'Создать профиль' : 'Войти в FitFlow'}</button></form></section></main>;
+}
+
+function Metric({ icon: Icon, label, value, hint, tone }) { return <article className={`metric ${tone}`}><span className="metric-icon"><Icon /></span><div><p>{label}</p><strong>{value}</strong><small>{hint}</small></div></article>; }
+
+function Dashboard({ workouts, meals, advice }) {
+  const calories = meals.reduce((n, x) => n + (+x.calories || 0), 0);
+  return <div className="page-stack"><div className="hero"><div><p className="eyebrow">СЕГОДНЯ · {new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</p><h2>Двигайтесь в своём ритме.</h2><p>Небольшая последовательность сильнее редких рывков.</p></div><div className="hero-ring"><strong>{workouts.length}</strong><span>тренировок</span></div></div><section className="metric-grid"><Metric icon={Dumbbell} label="Тренировки" value={workouts.length} hint={`${workouts.filter(x => x.training_status === 'PLANNED').length} запланировано`} tone="violet" /><Metric icon={Flame} label="Калории" value={calories} hint="в журнале" tone="orange" /><Metric icon={Salad} label="Приёмы пищи" value={meals.length} hint="всего записей" tone="green" /><Metric icon={Sparkles} label="Статус" value="В потоке" hint="продолжайте" tone="blue" /></section><section className="panel advice"><Sparkles /><div><p className="eyebrow">СОВЕТ FITFLOW</p><h3>{advice?.message || advice?.advice || 'Планируйте восстановление так же внимательно, как нагрузку.'}</h3></div></section><section className="panel"><div className="section-head"><h3>Ближайшие тренировки</h3></div><div className="compact-list">{workouts.slice(0, 4).map(x => <div key={x.id}><span className="date-tile">{new Date(x.training_date).getDate()}</span><div><strong>{x.training_name}</strong><small>{x.training_date}</small></div><span className="status">{x.training_status}</span></div>)}{!workouts.length && <p className="empty">Добавьте первую тренировку.</p>}</div></section></div>;
+}
+
+function Workouts({ items, reload, remove }) {
+  const [form, setForm] = useState({ training_name: '', training_date: today(), training_status: 'PLANNED', sets: [] }), [error, setError] = useState('');
+  const submit = async e => { e.preventDefault(); try { await FitFlowApi.createTraining(form); setForm({ ...form, training_name: '' }); reload(); } catch (x) { setError(x.message); } };
+  return <div className="page-stack"><div className="page-title"><div><p className="eyebrow">ПЛАН И ИСТОРИЯ</p><h2>Тренировки</h2></div></div><ErrorBanner value={error} clear={() => setError('')} /><section className="panel"><div className="section-head"><h3><Plus /> Новая тренировка</h3></div><form className="inline-form" onSubmit={submit}><label>Название<input required value={form.training_name} onChange={e => setForm({ ...form, training_name: e.target.value })} placeholder="Силовая на всё тело" /></label><label>Дата<input required type="date" value={form.training_date} onChange={e => setForm({ ...form, training_date: e.target.value })} /></label><label>Статус<select value={form.training_status} onChange={e => setForm({ ...form, training_status: e.target.value })}><option>PLANNED</option><option>IN_PROGRESS</option><option>COMPLETED</option><option>CANCELLED</option></select></label><button className="primary">Добавить</button></form></section><section className="cards-list">{items.map(x => <article className="workout-card" key={x.id}><div className="workout-icon"><Dumbbell /></div><div><p className="eyebrow">{x.training_date}</p><h3>{x.training_name}</h3><span className="status">{x.training_status}</span></div><button className="text-danger" onClick={() => remove(x.id)}>Удалить</button></article>)}{!items.length && <div className="panel empty">Список пока пуст.</div>}</section></div>;
+}
+
+function Nutrition({ items, reload }) {
+  const empty = { foodName: '', calories: '', protein: '', carbs: '', fats: '', consumedAt: localNow() };
+  const [form, setForm] = useState(empty), [error, setError] = useState('');
+  const totals = useMemo(() => items.reduce((a, x) => Object.fromEntries(Object.keys(fields).map(k => [k, a[k] + (+x[k] || 0)])), { calories: 0, protein: 0, carbs: 0, fats: 0 }), [items]);
+  const submit = async e => { e.preventDefault(); try { await FitFlowApi.createMeal({ ...form, ...Object.fromEntries(Object.keys(fields).map(k => [k, +form[k]])), consumedAt: new Date(form.consumedAt).toISOString() }); setForm(empty); reload(); } catch (x) { setError(x.message); } };
+  return <div className="page-stack"><div className="page-title"><div><p className="eyebrow">БАЛАНС И ЭНЕРГИЯ</p><h2>Питание</h2></div></div><ErrorBanner value={error} clear={() => setError('')} /><section className="macro-grid"><Metric icon={Flame} label="Калории" value={Math.round(totals.calories)} hint="ккал" tone="orange" /><Metric icon={Beef} label="Белки" value={Math.round(totals.protein)} hint="грамм" tone="violet" /><Metric icon={Salad} label="Углеводы" value={Math.round(totals.carbs)} hint="грамм" tone="green" /><Metric icon={Activity} label="Жиры" value={Math.round(totals.fats)} hint="грамм" tone="blue" /></section><section className="panel"><div className="section-head"><h3><Plus /> Записать приём пищи</h3></div><form className="meal-form" onSubmit={submit}><label className="grow">Блюдо<input required value={form.foodName} onChange={e => setForm({ ...form, foodName: e.target.value })} /></label>{Object.entries(fields).map(([k, label]) => <label key={k}>{label}<input required min="0" step="0.1" type="number" value={form[k]} onChange={e => setForm({ ...form, [k]: e.target.value })} /></label>)}<button className="primary">Сохранить</button></form></section><section className="panel"><div className="section-head"><h3>Журнал питания</h3></div><div className="table-list">{items.map(x => <div key={x.id}><div><strong>{x.foodName}</strong><small>{x.consumedAt ? new Date(x.consumedAt).toLocaleString('ru-RU') : ''}</small></div><b>{x.calories} ккал</b><span>Б {x.protein || 0} · У {x.carbs || 0} · Ж {x.fats || 0}</span></div>)}{!items.length && <p className="empty">Записей пока нет.</p>}</div></section></div>;
+}
+
+function Community({ user }) {
+  const [posts, setPosts] = useState([]), [text, setText] = useState(''), [error, setError] = useState('');
+  const load = useCallback(async () => { try { setPosts((await FeedService.getPersonalizedFeed(user.id, 0, 30)).posts || []); } catch (x) { setError(x.message); } }, [user.id]);
+  useEffect(() => { load(); }, [load]);
+  const publish = async e => { e.preventDefault(); try { await FeedService.createPost({ authorDisplayName: user.fullName, text, postType: 'FREEFORM', tags: ['fitflow'], category: 'TRAINING', visibility: 'PUBLIC' }); setText(''); load(); } catch (x) { setError(x.message); } };
+  return <div className="page-stack"><div className="page-title"><div><p className="eyebrow">СООБЩЕСТВО</p><h2>Лента FitFlow</h2></div><button className="icon-button" onClick={load}><RefreshCw /></button></div><ErrorBanner value={error} clear={() => setError('')} /><section className="panel"><form className="post-form" onSubmit={publish}><textarea required value={text} onChange={e => setText(e.target.value)} placeholder="Поделитесь тренировкой или результатом…" /><button className="primary">Опубликовать</button></form></section><div className="feed-list">{posts.map(({ post }) => <PostCard key={post.id} post={post} currentUserId={user.id} />)}{!posts.length && <div className="panel empty">Лента пока пуста.</div>}</div></div>;
+}
+
+const navigation = [['dashboard','Обзор',LayoutDashboard],['workouts','Тренировки',Dumbbell],['nutrition','Питание',Salad],['community','Сообщество',Users]];
 export default function App() {
-  const [userId,    setUserId]    = useState('user1');
-  const [activeTab, setActiveTab] = useState('personalized');
-  const [posts,     setPosts]     = useState([]);
-  const [page,      setPage]      = useState(0);
-  const [hasNext,   setHasNext]   = useState(false);
-  const [loading,   setLoading]   = useState(false);
-  const [error,     setError]     = useState(null);
-
-  // Search state
-  const [searchOpen,  setSearchOpen]  = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResult, setSearchResult] = useState(null);
-  const [searching,   setSearching]   = useState(false);
-
-  const loadFeed = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      let data;
-      if (activeTab === 'personalized') {
-        data = await FeedService.getPersonalizedFeed(userId, page, 10);
-        setPosts(data.posts || []);
-        setHasNext(data.hasNext || false);
-      } else if (activeTab === 'following') {
-        data = await FeedService.getFollowingFeed(userId, page, 20);
-        setPosts(data.posts || []);
-        setHasNext(data.hasNext || false);
-      } else {
-        const trending = await FeedService.getTrendingPosts(20);
-        // Wrap plain PostDoc array as RankedPost for uniform rendering
-        setPosts((trending || []).map(p => ({ post: p, score: 0 })));
-        setHasNext(false);
-      }
-    } catch (err) {
-      setError('Could not load feed. Is the backend running?');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [userId, activeTab, page]);
-
-  useEffect(() => { loadFeed(); }, [loadFeed]);
-
-  const handleTabChange = (tab) => {
-    setActiveTab(tab);
-    setPage(0);
-    setPosts([]);
-    setSearchResult(null);
-  };
-
-  const handleUserChange = (id) => {
-    setUserId(id);
-    setPage(0);
-    setPosts([]);
-    setSearchResult(null);
-  };
-
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-    setSearching(true);
-    setError(null);
-    try {
-      const result = await FeedService.searchPosts(userId, searchQuery);
-      setSearchResult(result);
-    } catch (err) {
-      setError('Search failed. Please try again.');
-    } finally {
-      setSearching(false);
-    }
-  };
-
-  // Normalise: both /trending (PostDoc[]) and /feed (RankedPost[]) come through as RankedPost
-  const displayPosts = searchResult
-    ? (searchResult.posts || []).map(p => ({ post: p, score: 0 }))
-    : posts;
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50">
-      {/* ── Header ─────────────────────────────────────────────────────── */}
-      <header className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Activity className="w-7 h-7 text-indigo-600" aria-hidden="true" />
-            <h1 className="text-xl font-bold text-gray-900">FitFeed</h1>
-          </div>
-
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={() => setSearchOpen(v => !v)}
-              className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
-              aria-label="Toggle search"
-            >
-              <Search className="w-5 h-5" />
-            </button>
-            <UserSelector selectedUser={userId} onUserChange={handleUserChange} />
-          </div>
-        </div>
-
-        {/* Search bar */}
-        {searchOpen && (
-          <div className="border-t border-gray-100 bg-white px-4 py-3">
-            <form onSubmit={handleSearch} className="flex space-x-2">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Search posts by topic, e.g. 'leg day tips'…"
-                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                aria-label="Search query"
-              />
-              <button
-                type="submit"
-                disabled={searching}
-                className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-indigo-700 transition-colors"
-              >
-                {searching ? '…' : 'Search'}
-              </button>
-              {searchResult && (
-                <button
-                  type="button"
-                  onClick={() => { setSearchResult(null); setSearchQuery(''); }}
-                  className="p-2 text-gray-500 hover:text-gray-700"
-                  aria-label="Clear search"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              )}
-            </form>
-            {searchResult?.aiExplanation && (
-              <p className="mt-2 text-xs text-indigo-700 bg-indigo-50 rounded-lg px-3 py-2">
-                🤖 {searchResult.aiExplanation}
-              </p>
-            )}
-          </div>
-        )}
-      </header>
-
-      {/* ── Tab bar ────────────────────────────────────────────────────── */}
-      {!searchResult && (
-        <nav className="bg-white border-b border-gray-100 sticky top-[72px] z-10" aria-label="Feed tabs">
-          <div className="max-w-3xl mx-auto px-4 flex">
-            {TABS.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                onClick={() => handleTabChange(id)}
-                className={`flex items-center space-x-1.5 py-3 px-5 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === id
-                    ? 'border-indigo-500 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-                aria-selected={activeTab === id}
-                role="tab"
-              >
-                <Icon className="w-4 h-4" aria-hidden="true" />
-                <span>{label}</span>
-              </button>
-            ))}
-          </div>
-        </nav>
-      )}
-
-      {/* ── Main ───────────────────────────────────────────────────────── */}
-      <main className="max-w-3xl mx-auto px-4 py-6">
-        {/* Search heading */}
-        {searchResult && (
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800">
-              Search results for "{searchQuery}"
-            </h2>
-            <button
-              onClick={() => { setSearchResult(null); setSearchQuery(''); }}
-              className="text-sm text-indigo-600 hover:underline"
-            >
-              Back to feed
-            </button>
-          </div>
-        )}
-
-        {/* Error */}
-        {error && (
-          <div role="alert" className="bg-red-50 border-l-4 border-red-400 p-4 mb-4 rounded-r-lg text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        {/* Loading */}
-        {(loading || searching) && <LoadingSpinner />}
-
-        {/* Posts */}
-        {!loading && !searching && (
-          <>
-            <div className="space-y-4">
-              {displayPosts.map(({ post }) => (
-                <PostCard key={post.id} post={post} currentUserId={userId} />
-              ))}
-            </div>
-
-            {displayPosts.length === 0 && (
-              <div className="text-center py-16 text-gray-400">
-                <Activity className="w-12 h-12 mx-auto mb-3 opacity-40" />
-                <p className="text-lg">No posts yet</p>
-                <p className="text-sm mt-1">
-                  {activeTab === 'following'
-                    ? 'Follow some users to see their posts here.'
-                    : 'Check back soon for fresh content.'}
-                </p>
-              </div>
-            )}
-
-            {/* Pagination — only for paginated tabs */}
-            {!searchResult && activeTab !== 'trending' && (
-              <div className="flex justify-center items-center space-x-4 mt-8">
-                <button
-                  onClick={() => setPage(p => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                  className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm disabled:opacity-40 hover:bg-gray-50 transition-colors"
-                >
-                  Previous
-                </button>
-                <span className="text-sm text-gray-600">Page {page + 1}</span>
-                <button
-                  onClick={() => setPage(p => p + 1)}
-                  disabled={!hasNext}
-                  className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm disabled:opacity-40 hover:bg-gray-50 transition-colors"
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </main>
-    </div>
-  );
+  const [auth, setAuth] = useState(getStoredAuth()), [user, setUser] = useState(auth?.user), [view, setView] = useState('dashboard'), [workouts, setWorkouts] = useState([]), [meals, setMeals] = useState([]), [advice, setAdvice] = useState(), [error, setError] = useState(''), [loading, setLoading] = useState(Boolean(auth));
+  const reload = useCallback(async () => { if (!getStoredAuth()) return; setLoading(true); try { const [u, w, m, a] = await Promise.all([FitFlowApi.me(), FitFlowApi.trainings(), FitFlowApi.mealLogs(), FitFlowApi.advice().catch(() => null)]); setUser(u); setWorkouts(Array.isArray(w) ? w : w.content || []); setMeals(Array.isArray(m) ? m : []); setAdvice(a); } catch (x) { setError(x.message); } finally { setLoading(false); } }, []);
+  useEffect(() => { if (auth) reload(); }, [auth, reload]);
+  if (!auth) return <Auth done={x => { setAuth(x); setUser(x.user); }} />;
+  const logout = () => { storeAuth(null); setAuth(null); };
+  const remove = async id => { try { await FitFlowApi.deleteTraining(id); reload(); } catch (x) { setError(x.message); } };
+  return <div className="app-shell"><aside><div className="logo"><span><Activity /></span><strong>FitFlow</strong></div><nav>{navigation.map(([id,label,Icon]) => <button key={id} className={view === id ? 'active' : ''} onClick={() => setView(id)}><Icon /><span>{label}</span></button>)}</nav><div className="sidebar-user"><div>{(user?.fullName || 'U')[0]}</div><span><strong>{user?.fullName || user?.username}</strong><small>{user?.email}</small></span><button onClick={logout}><LogOut /></button></div></aside><main className="content"><header><div><CalendarDays /><span>{new Date().toLocaleDateString('ru-RU', { weekday:'long', day:'numeric', month:'long' })}</span></div><button className="icon-button" onClick={reload}><RefreshCw /></button></header><ErrorBanner value={error} clear={() => setError('')} />{loading ? <div className="loading-page"><Activity /><p>Собираем данные FitFlow…</p></div> : <>{view === 'dashboard' && <Dashboard workouts={workouts} meals={meals} advice={advice} />}{view === 'workouts' && <Workouts items={workouts} reload={reload} remove={remove} />}{view === 'nutrition' && <Nutrition items={meals} reload={reload} />}{view === 'community' && <Community user={user} />}</>}</main></div>;
 }

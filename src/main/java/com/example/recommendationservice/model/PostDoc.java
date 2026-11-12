@@ -26,6 +26,12 @@ public class PostDoc {
     private String authorId;
 
     @Field(type = FieldType.Keyword)
+    private String authorDisplayName;
+
+    @Field(type = FieldType.Keyword)
+    private String authorAvatarUrl;
+
+    @Field(type = FieldType.Keyword)
     private String visibility;
 
     @Field(type = FieldType.Text)
@@ -39,6 +45,18 @@ public class PostDoc {
 
     @Field(type = FieldType.Keyword)
     private List<String> tags;
+
+    @Field(type = FieldType.Keyword)
+    private List<String> mediaUrls;
+
+    @Field(type = FieldType.Keyword)
+    private String relatedTrainingId;
+
+    @Field(type = FieldType.Double)
+    private Double durationMinutes;
+
+    @Field(type = FieldType.Double)
+    private Double caloriesBurned;
 
     @Field(type = FieldType.Long)
     private long likesCount;

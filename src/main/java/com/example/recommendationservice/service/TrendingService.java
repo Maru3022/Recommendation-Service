@@ -7,6 +7,7 @@ import com.example.recommendationservice.repository.PostSearchRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -60,6 +61,11 @@ public class TrendingService {
         redisTemplate.expire(TRENDING_KEY, 1, TimeUnit.HOURS);
 
         List<String> topIds = postIds.stream().limit(limit).toList();
+        if (topIds.isEmpty()) {
+            return postSearchRepository.findAll(
+                    PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "createdAt")))
+                    .getContent();
+        }
         return postSearchRepository.findByIdIn(topIds);
     }
 }

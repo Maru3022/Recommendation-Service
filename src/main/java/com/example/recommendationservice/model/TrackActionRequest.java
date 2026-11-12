@@ -13,7 +13,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class TrackActionRequest {
 
-    @NotBlank(message = "User ID cannot be blank")
     private String userId;
 
     /**

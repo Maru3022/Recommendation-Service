@@ -18,7 +18,6 @@ import java.util.List;
 @NoArgsConstructor
 public class CreatePostRequest {
 
-    @NotBlank(message = "Author ID cannot be blank")
     private String authorId;
 
     @NotBlank(message = "Author display name cannot be blank")

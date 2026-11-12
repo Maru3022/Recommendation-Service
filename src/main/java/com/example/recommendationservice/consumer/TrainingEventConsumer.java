@@ -1,6 +1,7 @@
 package com.example.recommendationservice.consumer;
 
 import com.example.recommendationservice.model.PostDoc;
+import com.example.recommendationservice.dto.TrainingCreatedEvent;
 import com.example.recommendationservice.service.PostService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -63,15 +64,19 @@ public class TrainingEventConsumer {
      * Listens for new training definitions created in Training-Service.
      * Creates a TIP post if the training has a description worth sharing.
      */
-    @KafkaListener(topics = "training.created", groupId = "rec-group")
-    public void onTrainingCreated(PostDoc event) {
-        log.info("Received training.created event for author {}", event.getAuthorId());
+    @KafkaListener(topics = "training.created", groupId = "rec-group",
+            containerFactory = "trainingCreatedKafkaListenerContainerFactory")
+    public void onTrainingCreated(TrainingCreatedEvent event) {
+        log.info("Received training.created event for user {}", event.getUserId());
         try {
-            if (event.getText() == null || event.getText().isBlank()) {
-                log.debug("training.created event has no text, skipping post generation");
-                return;
-            }
-            PostDoc post = buildPost(event, "TIP", List.of("training", "tip"));
+            PostDoc post = new PostDoc();
+            post.setAuthorId(event.getUserId().toString());
+            post.setText("Planned workout: " + event.getTrainingName() + " on " + event.getTrainingDate());
+            post.setPostType("TIP");
+            post.setCategory("TRAINING");
+            post.setVisibility("PUBLIC");
+            post.setCreatedAt(Instant.now());
+            post.setTags(List.of("training", "planned"));
             postService.savePost(post);
             log.info("Auto-generated TIP post {} for author {}", post.getId(), post.getAuthorId());
         } catch (Exception e) {

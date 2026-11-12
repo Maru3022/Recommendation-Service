@@ -155,8 +155,8 @@ public class FeedRankingService {
 
             NativeQuery query = NativeQuery.builder()
                     .withMaxResults(0)
-                    .withQuery(Query.of(q -> q.range(r ->
-                            r.field("createdAt").gte(co.elastic.clients.json.JsonData.of(windowStart)))))
+                    .withQuery(Query.of(q -> q.range(r -> r.date(d ->
+                            d.field("createdAt").gte(windowStart)))))
                     .withAggregation("trending_posts", Aggregation.of(a -> a
                             .terms(t -> t.field("postId").size(limit))))
                     .build();
@@ -317,8 +317,8 @@ public class FeedRankingService {
             String windowStart = Instant.now().minus(windowHours, ChronoUnit.HOURS).toString();
             NativeQuery query = NativeQuery.builder()
                     .withMaxResults(0)
-                    .withQuery(Query.of(q -> q.range(r ->
-                            r.field("createdAt").gte(co.elastic.clients.json.JsonData.of(windowStart)))))
+                    .withQuery(Query.of(q -> q.range(r -> r.date(d ->
+                            d.field("createdAt").gte(windowStart)))))
                     .withAggregation("trending", Aggregation.of(a -> a
                             .terms(t -> t.field("postId").size(limit))))
                     .build();

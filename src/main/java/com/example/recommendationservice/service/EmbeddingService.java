@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.embedding.EmbeddingResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -20,6 +21,9 @@ import java.util.stream.Collectors;
 public class EmbeddingService {
 
     private final EmbeddingModel embeddingModel;
+
+    @Value("${fitflow.embeddings.enabled:true}")
+    private boolean embeddingsEnabled;
 
     /**
      * Build a text representation of the post and compute its embedding.
@@ -53,6 +57,10 @@ public class EmbeddingService {
     // -------------------------------------------------------------------------
 
     private Optional<float[]> embed(String text, String label) {
+        if (!embeddingsEnabled) {
+            log.debug("Embeddings are disabled; skipping {}", label);
+            return Optional.empty();
+        }
         try {
             EmbeddingResponse response = embeddingModel.embedForResponse(List.of(text));
             if (response != null && !response.getResults().isEmpty()) {
