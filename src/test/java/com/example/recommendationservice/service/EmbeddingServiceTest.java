@@ -8,6 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.embedding.EmbeddingResponse;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Optional;
@@ -23,6 +24,11 @@ class EmbeddingServiceTest {
 
     @InjectMocks
     private EmbeddingService embeddingService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void enableEmbeddings() {
+        ReflectionTestUtils.setField(embeddingService, "embeddingsEnabled", true);
+    }
 
     @Test
     void generateEmbeddingForQuery_returnsEmbeddingVector() {

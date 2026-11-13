@@ -34,6 +34,13 @@ class FeedService {
     return data;
   }
 
+  static async uploadMedia(file) {
+    const body = new FormData();
+    body.append('file', file);
+    const { data } = await api.post('/api/v1/media', body);
+    return data;
+  }
+
   static async getPost(postId) {
     const { data } = await api.get(`/api/v1/posts/${postId}`);
     return data;

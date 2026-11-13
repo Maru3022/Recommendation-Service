@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const TOKEN_KEY = 'fitflow.auth';
-const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:8075';
+const baseURL = process.env.REACT_APP_API_URL || '/';
 
 export const api = axios.create({ baseURL, timeout: 15000 });
 
@@ -27,10 +27,17 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message = error.response?.data?.message
+    const rawMessage = error.response?.data?.message
       || error.response?.data?.error
-      || (error.code === 'ECONNABORTED' ? 'Сервис не ответил вовремя' : error.message)
-      || 'Не удалось выполнить запрос';
+      || (typeof error.response?.data === 'string' ? error.response.data : '')
+      || error.message;
+    const message = /unexpected error|internal server error/i.test(rawMessage || '')
+      ? 'Не удалось выполнить операцию. Проверьте введённые данные и попробуйте ещё раз.'
+      : error.code === 'ECONNABORTED'
+        ? 'Сервис не ответил вовремя. Попробуйте ещё раз.'
+        : !error.response
+          ? 'Нет связи с сервером. Проверьте, что локальное окружение запущено.'
+          : rawMessage || 'Не удалось выполнить запрос';
     return Promise.reject(new Error(message));
   },
 );
@@ -47,6 +54,11 @@ export const FitFlowApi = {
     return data;
   },
   async me() { return (await api.get('/api/v1/users/me')).data; },
+  async updateProfile(user) { return (await api.put(`/api/v1/users/${user.id}`, user)).data; },
+  async stats(userId) { return (await api.get(`/api/v1/users/${userId}/stats`)).data; },
+  avatarUrl(userId) { return `${baseURL.replace(/\/$/, '')}/api/v1/users/${userId}/avatar`; },
+  async uploadAvatar(file) { const body = new FormData(); body.append('file', file); await api.post('/api/v1/users/me/avatar', body); },
+  async deleteAvatar() { await api.delete('/api/v1/users/me/avatar'); },
   async trainings() { return (await api.get('/api/v1/trainings')).data; },
   async createTraining(payload) { return (await api.post('/api/v1/trainings', payload)).data; },
   async deleteTraining(id) { await api.delete(`/api/v1/trainings/${id}`); },

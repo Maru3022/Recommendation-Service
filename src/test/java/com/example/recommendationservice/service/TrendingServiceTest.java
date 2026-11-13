@@ -11,6 +11,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Page;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 
@@ -81,6 +82,7 @@ class TrendingServiceTest {
         when(feedProperties.getTrendingWindowHours()).thenReturn(72);
         when(postActionRepository.findTrendingPostIds(any(), eq(PageRequest.of(0, 200))))
                 .thenReturn(List.of());
+        when(postSearchRepository.findAll(any(PageRequest.class))).thenReturn(Page.empty());
 
         List<PostDoc> result = trendingService.getTrendingPosts(10);
 
