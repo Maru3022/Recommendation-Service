@@ -32,6 +32,7 @@ class FeedScoringServiceTest {
     @Mock private TrendingService trendingService;
     @Mock private ScoringService scoringService;
     @Mock private FeedProperties feedProperties;
+    @Mock private PostVisibilityPolicy visibilityPolicy;
 
     @InjectMocks
     private FeedScoringService feedScoringService;
@@ -59,6 +60,7 @@ class FeedScoringServiceTest {
                 });
         when(scoringService.calculateEngagementScore(anyLong(), anyLong(), anyLong(), anyLong()))
                 .thenReturn(0.5);
+        when(visibilityPolicy.canView(any(PostDoc.class), anyString())).thenReturn(true);
     }
 
     @Test

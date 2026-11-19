@@ -6,6 +6,7 @@ import com.example.recommendationservice.model.PostDoc;
 import com.example.recommendationservice.model.TrackActionRequest;
 import com.example.recommendationservice.service.PostActionService;
 import com.example.recommendationservice.service.PostService;
+import com.example.recommendationservice.service.PostVisibilityPolicy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +27,7 @@ class PostControllerTest {
 
     @Mock private PostService postService;
     @Mock private PostActionService postActionService;
+    @Mock private PostVisibilityPolicy visibilityPolicy;
 
     @InjectMocks
     private PostController postController;
@@ -64,8 +66,9 @@ class PostControllerTest {
     @Test
     void getPost_returnsPost() {
         when(postService.getPost("post1")).thenReturn(Optional.of(testPost));
+        when(visibilityPolicy.canView(testPost, "author1")).thenReturn(true);
 
-        ResponseEntity<PostDoc> result = postController.getPost("post1");
+        ResponseEntity<PostDoc> result = postController.getPost("author1", "post1");
 
         assertThat(result.getBody()).isNotNull();
         assertThat(result.getBody().getId()).isEqualTo("post1");
@@ -75,7 +78,7 @@ class PostControllerTest {
     void getPost_returnsNotFoundWhenMissing() {
         when(postService.getPost("post1")).thenReturn(Optional.empty());
 
-        ResponseEntity<PostDoc> result = postController.getPost("post1");
+        ResponseEntity<PostDoc> result = postController.getPost("author1", "post1");
 
         assertThat(result.getStatusCode().value()).isEqualTo(404);
     }

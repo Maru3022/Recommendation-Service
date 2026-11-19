@@ -35,6 +35,7 @@ class SemanticSearchServiceTest {
     @Mock private ChatClient chatClient;
     @Mock private ChatClient.ChatClientRequestSpec requestSpec;
     @Mock private ChatClient.CallResponseSpec callResponseSpec;
+    @Mock private PostVisibilityPolicy visibilityPolicy;
 
     @InjectMocks
     private SemanticSearchService semanticSearchService;
@@ -48,6 +49,8 @@ class SemanticSearchServiceTest {
         testPost.setAuthorId("author1");
         testPost.setText("Test post about fitness");
         testPost.setCreatedAt(Instant.now());
+        when(visibilityPolicy.visibleTo(anyList(), anyString()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test

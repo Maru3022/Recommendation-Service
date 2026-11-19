@@ -34,7 +34,7 @@ class SemanticSearchControllerTest {
 
         when(semanticSearchService.searchByQuery("fitness tips", "user1", 10)).thenReturn(expected);
 
-        ResponseEntity<SearchResponse> result = semanticSearchController.search(request);
+        ResponseEntity<SearchResponse> result = semanticSearchController.search("user1", request);
 
         assertThat(result.getBody()).isNotNull();
         assertThat(result.getBody().getPosts()).hasSize(1);
