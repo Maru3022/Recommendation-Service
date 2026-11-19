@@ -1,7 +1,6 @@
 package com.example.recommendationservice.consumer;
 
 import com.example.recommendationservice.model.PostDoc;
-import com.example.recommendationservice.dto.TrainingCreatedEvent;
 import com.example.recommendationservice.service.PostService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,7 +18,6 @@ import java.util.List;
  *
  * <h3>Supported topics (extend as needed):</h3>
  * <ul>
- *   <li>{@code training.created}  – a new Training was persisted (Training-Service)</li>
  *   <li>{@code train.completed}   – a Train (session) was completed (Trains-Service)</li>
  * </ul>
  *
@@ -57,30 +55,6 @@ public class TrainingEventConsumer {
                     post.getId(), post.getAuthorId());
         } catch (Exception e) {
             log.error("Failed to process train.completed event: {}", e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Listens for new training definitions created in Training-Service.
-     * Creates a TIP post if the training has a description worth sharing.
-     */
-    @KafkaListener(topics = "training.created", groupId = "rec-group",
-            containerFactory = "trainingCreatedKafkaListenerContainerFactory")
-    public void onTrainingCreated(TrainingCreatedEvent event) {
-        log.info("Received training.created event for user {}", event.getUserId());
-        try {
-            PostDoc post = new PostDoc();
-            post.setAuthorId(event.getUserId().toString());
-            post.setText("Planned workout: " + event.getTrainingName() + " on " + event.getTrainingDate());
-            post.setPostType("TIP");
-            post.setCategory("TRAINING");
-            post.setVisibility("PUBLIC");
-            post.setCreatedAt(Instant.now());
-            post.setTags(List.of("training", "planned"));
-            postService.savePost(post);
-            log.info("Auto-generated TIP post {} for author {}", post.getId(), post.getAuthorId());
-        } catch (Exception e) {
-            log.error("Failed to process training.created event: {}", e.getMessage(), e);
         }
     }
 
