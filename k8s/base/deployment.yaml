@@ -29,6 +29,12 @@ spec:
         - name: recommendation-service
           image: ghcr.io/maru3022/recommendation-service:latest
           imagePullPolicy: IfNotPresent
+          env:
+            - name: INTERNAL_GATEWAY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: fitflow-internal-secrets
+                  key: INTERNAL_GATEWAY_SECRET
           ports:
             - name: http
               containerPort: 8080

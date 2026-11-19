@@ -6,7 +6,6 @@ namespace: recommendation-production
 resources:
   - ../../base
   - namespace.yaml
-  - ingress.yaml
 
 images:
   - name: recommendation-service
