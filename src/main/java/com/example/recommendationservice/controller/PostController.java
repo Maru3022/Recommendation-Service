@@ -6,6 +6,7 @@ import com.example.recommendationservice.model.PostDoc;
 import com.example.recommendationservice.model.TrackActionRequest;
 import com.example.recommendationservice.service.PostActionService;
 import com.example.recommendationservice.service.PostService;
+import com.example.recommendationservice.service.PostVisibilityPolicy;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -33,6 +34,7 @@ public class PostController {
 
     private final PostService       postService;
     private final PostActionService postActionService;
+    private final PostVisibilityPolicy visibilityPolicy;
 
     // -------------------------------------------------------------------------
     // Post CRUD
@@ -60,9 +62,11 @@ public class PostController {
     })
     @GetMapping("/{postId}")
     public ResponseEntity<PostDoc> getPost(
+            @RequestHeader("X-User-Id") String requestingUserId,
             @PathVariable @NotBlank @Size(max = 50) String postId) {
 
         return postService.getPost(postId)
+                .filter(post -> visibilityPolicy.canView(post, requestingUserId))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }

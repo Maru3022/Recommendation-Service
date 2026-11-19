@@ -23,6 +23,7 @@ public class FeedScoringService {
     private final TrendingService trendingService;
     private final ScoringService scoringService;
     private final FeedProperties feedProperties;
+    private final PostVisibilityPolicy visibilityPolicy;
 
     public List<PostSummaryDto> buildFeed(String userId, int candidateCount, Set<String> excludeIds) {
         int perSource = candidateCount / 4;
@@ -60,6 +61,7 @@ public class FeedScoringService {
         Set<String> contentIds = contentPosts.stream().map(PostDoc::getId).collect(Collectors.toSet());
 
         return allCandidates.values().stream()
+                .filter(post -> visibilityPolicy.canView(post, userId))
                 .map(post -> {
                     double social = socialIds.contains(post.getId()) ? 1.0 : 0.0;
                     double collaborative = collaborativeIds.contains(post.getId()) ? 1.0 : 0.0;

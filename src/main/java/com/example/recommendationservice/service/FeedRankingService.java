@@ -53,6 +53,7 @@ public class FeedRankingService {
     private final SocialGraphService      socialGraphService;
     private final RedisTemplate<String, Object> redisTemplate;
     private final ElasticsearchOperations elasticsearchOperations;
+    private final PostVisibilityPolicy visibilityPolicy;
     private final ScoringService         scoringService;
 
     // =========================================================================
@@ -77,7 +78,7 @@ public class FeedRankingService {
 
         List<FeedResponse.RankedPost> ranked = candidates.stream()
                 .filter(p -> !muted.contains(p.getAuthorId()))          // negative signal: muted authors
-                .filter(p -> p.getVisibility() == null || "PUBLIC".equalsIgnoreCase(p.getVisibility()))
+                .filter(p -> visibilityPolicy.canView(p, userId))
                 .map(post -> {
                     double score = hybridScore(post, userId, following, trendingIds, seenPostIds, contentScores);
                     return FeedResponse.RankedPost.builder().post(post).score(score).build();

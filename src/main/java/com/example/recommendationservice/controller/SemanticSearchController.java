@@ -31,10 +31,11 @@ public class SemanticSearchController {
             @ApiResponse(responseCode = "400", description = "Invalid request")
     })
     @PostMapping("/search")
-    public ResponseEntity<SearchResponse> search(@Valid @RequestBody SearchRequest request) {
-        log.info("Semantic search | user={} query='{}'", request.getUserId(), request.getQuery());
+    public ResponseEntity<SearchResponse> search(@RequestHeader("X-User-Id") String userId,
+                                                 @Valid @RequestBody SearchRequest request) {
+        log.info("Semantic search | user={} query='{}'", userId, request.getQuery());
         SearchResponse response = semanticSearchService.searchByQuery(
-                request.getQuery(), request.getUserId(), 10);
+                request.getQuery(), userId, 10);
         return ResponseEntity.ok(response);
     }
 }

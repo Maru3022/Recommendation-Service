@@ -33,6 +33,7 @@ public class SemanticSearchService {
 
     private final EmbeddingService        embeddingService;
     private final ElasticsearchOperations elasticsearchOperations;
+    private final PostVisibilityPolicy visibilityPolicy;
     private final PostSearchRepository    postSearchRepository;
     private final ChatClient.Builder      chatClientBuilder;
 
@@ -49,6 +50,7 @@ public class SemanticSearchService {
                 log.warn("kNN returned no results for query '{}', falling back to multi_match", userQuery);
                 posts = performFallbackSearch(userQuery, limit);
             }
+            posts = visibilityPolicy.visibleTo(posts, userId);
 
             String explanation = generateAiExplanation(userQuery, posts);
             return SearchResponse.builder()
@@ -59,6 +61,7 @@ public class SemanticSearchService {
         } catch (Exception e) {
             log.error("Error in semantic search, falling back", e);
             List<PostDoc> posts = performFallbackSearch(userQuery, limit);
+            posts = visibilityPolicy.visibleTo(posts, userId);
             return SearchResponse.builder()
                     .aiExplanation("Showing posts relevant to your query.")
                     .posts(posts)

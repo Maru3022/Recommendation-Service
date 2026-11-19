@@ -40,6 +40,7 @@ public class FeedController {
     private final TrendingService trendingService;
     private final SocialSignalService socialSignalService;
     private final PostActionService postActionService;
+    private final PostVisibilityPolicy visibilityPolicy;
 
     @GetMapping("/personalized")
     @Operation(summary = "Get personalized recommendation feed (hybrid approach)")
@@ -79,12 +80,13 @@ public class FeedController {
     @GetMapping("/trending")
     @Operation(summary = "Get trending posts feed")
     public ResponseEntity<FeedResponse> getTrendingFeed(
+            @RequestHeader("X-User-Id") String userId,
             @Parameter(description = "Page number (0-based)") @RequestParam(defaultValue = "0") @Min(0) int page,
             @Parameter(description = "Page size") @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
     ) {
         log.info("Getting trending feed, page {}, size {}", page, size);
         
-        List<PostDoc> trendingPosts = trendingService.getTrendingPosts(size);
+        List<PostDoc> trendingPosts = visibilityPolicy.visibleTo(trendingService.getTrendingPosts(size), userId);
         List<PostSummaryDto> posts = convertToPostSummaryDtos(trendingPosts);
         
         FeedResponse response = FeedResponse.builder()
@@ -106,8 +108,8 @@ public class FeedController {
     ) {
         log.info("Getting collaborative feed for user {}, limit {}", userId, limit);
         
-        List<PostDoc> posts = collaborativeFilteringService.getCollaborativePosts(
-                userId, limit, excludePostIds != null ? excludePostIds : Collections.emptySet());
+        List<PostDoc> posts = visibilityPolicy.visibleTo(collaborativeFilteringService.getCollaborativePosts(
+                userId, limit, excludePostIds != null ? excludePostIds : Collections.emptySet()), userId);
         List<PostSummaryDto> postDtos = convertToPostSummaryDtos(posts);
         
         FeedResponse response = FeedResponse.builder()
@@ -129,8 +131,8 @@ public class FeedController {
     ) {
         log.info("Getting content-based feed for user {}, limit {}", userId, limit);
         
-        List<PostDoc> posts = contentBasedService.getContentBasedPosts(
-                userId, limit, excludePostIds != null ? excludePostIds : Collections.emptySet());
+        List<PostDoc> posts = visibilityPolicy.visibleTo(contentBasedService.getContentBasedPosts(
+                userId, limit, excludePostIds != null ? excludePostIds : Collections.emptySet()), userId);
         List<PostSummaryDto> postDtos = convertToPostSummaryDtos(posts);
         
         FeedResponse response = FeedResponse.builder()
@@ -152,8 +154,8 @@ public class FeedController {
     ) {
         log.info("Getting social feed for user {}, limit {}", userId, limit);
         
-        List<PostDoc> posts = socialSignalService.getPostsFromFollowing(
-                userId, limit, excludePostIds != null ? excludePostIds : Collections.emptySet());
+        List<PostDoc> posts = visibilityPolicy.visibleTo(socialSignalService.getPostsFromFollowing(
+                userId, limit, excludePostIds != null ? excludePostIds : Collections.emptySet()), userId);
         List<PostSummaryDto> postDtos = convertToPostSummaryDtos(posts);
         
         FeedResponse response = FeedResponse.builder()
