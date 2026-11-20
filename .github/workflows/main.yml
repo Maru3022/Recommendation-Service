@@ -54,10 +54,10 @@ jobs:
         run: |
           version=0.6.7
           base="https://github.com/yannh/kubeconform/releases/download/v${version}"
-          curl --fail --silent --show-error --location --output kubeconform.tar.gz "${base}/kubeconform-linux-amd64.tar.gz"
+          curl --fail --silent --show-error --location --output kubeconform-linux-amd64.tar.gz "${base}/kubeconform-linux-amd64.tar.gz"
           curl --fail --silent --show-error --location --output CHECKSUMS "${base}/CHECKSUMS"
           grep 'kubeconform-linux-amd64.tar.gz' CHECKSUMS | sha256sum --check
-          tar -xzf kubeconform.tar.gz kubeconform
+          tar -xzf kubeconform-linux-amd64.tar.gz kubeconform
       - name: Render and validate Kubernetes overlays
         run: |
           kubectl kustomize k8s/overlays/staging > rendered-staging.yaml
