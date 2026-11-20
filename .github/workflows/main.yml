@@ -39,6 +39,16 @@ jobs:
           cache: maven
       - name: Verify unit and integration tests
         run: mvn -B -ntp clean verify -Pintegration-tests
+      - name: Install kubectl
+        shell: bash
+        run: |
+          version=v1.30.2
+          base="https://dl.k8s.io/release/${version}/bin/linux/amd64"
+          curl --fail --silent --show-error --location --output kubectl "${base}/kubectl"
+          curl --fail --silent --show-error --location --output kubectl.sha256 "${base}/kubectl.sha256"
+          echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check
+          chmod +x kubectl
+          echo "$PWD" >> "$GITHUB_PATH"
       - name: Install kubeconform
         shell: bash
         run: |
@@ -92,7 +102,7 @@ jobs:
           echo "image=${image}@${digest}" >> "$GITHUB_OUTPUT"
   deploy-staging:
     name: Deploy staging
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.STAGING_ENABLED == 'true'
     needs: publish
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -101,6 +111,16 @@ jobs:
       cancel-in-progress: false
     environment: staging
     steps:
+      - name: Install kubectl
+        shell: bash
+        run: |
+          version=v1.30.2
+          base="https://dl.k8s.io/release/${version}/bin/linux/amd64"
+          curl --fail --silent --show-error --location --output kubectl "${base}/kubectl"
+          curl --fail --silent --show-error --location --output kubectl.sha256 "${base}/kubectl.sha256"
+          echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check
+          chmod +x kubectl
+          echo "$PWD" >> "$GITHUB_PATH"
       - name: Configure Kubernetes
         env:
           KUBECONFIG_B64: ${{ secrets.KUBE_CONFIG_STAGING }}
@@ -142,6 +162,16 @@ jobs:
       - name: Validate digest
         run: |
           [[ "${{ inputs.image_digest }}" =~ ^sha256:[0-9a-f]{64}$ ]] || exit 1
+      - name: Install kubectl
+        shell: bash
+        run: |
+          version=v1.30.2
+          base="https://dl.k8s.io/release/${version}/bin/linux/amd64"
+          curl --fail --silent --show-error --location --output kubectl "${base}/kubectl"
+          curl --fail --silent --show-error --location --output kubectl.sha256 "${base}/kubectl.sha256"
+          echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check
+          chmod +x kubectl
+          echo "$PWD" >> "$GITHUB_PATH"
       - name: Configure Kubernetes
         env:
           KUBECONFIG_B64: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
@@ -156,3 +186,4 @@ jobs:
           image="${IMAGE_NAME,,}@${{ inputs.image_digest }}"
           kubectl set image deployment/recommendation-service recommendation-service="$image" -n recommendation-production
           kubectl rollout status deployment/recommendation-service -n recommendation-production --timeout=300s
+
