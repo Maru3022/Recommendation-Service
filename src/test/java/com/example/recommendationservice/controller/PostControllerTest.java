@@ -4,6 +4,7 @@ import com.example.recommendationservice.model.CreatePostRequest;
 import com.example.recommendationservice.model.PostAction;
 import com.example.recommendationservice.model.PostDoc;
 import com.example.recommendationservice.model.TrackActionRequest;
+import com.example.recommendationservice.service.FeedService;
 import com.example.recommendationservice.service.PostActionService;
 import com.example.recommendationservice.service.PostService;
 import com.example.recommendationservice.service.PostVisibilityPolicy;
@@ -26,6 +27,7 @@ import static org.mockito.Mockito.when;
 class PostControllerTest {
 
     @Mock private PostService postService;
+    @Mock private FeedService feedService;
     @Mock private PostActionService postActionService;
     @Mock private PostVisibilityPolicy visibilityPolicy;
 

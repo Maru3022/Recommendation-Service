@@ -28,11 +28,12 @@ import java.util.List;
 @Validated
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:8080"})
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:8080", "http://localhost:5173"})
 @Tag(name = "Post API", description = "Create, retrieve, delete posts and track user interactions")
 public class PostController {
 
     private final PostService       postService;
+    private final com.example.recommendationservice.service.FeedService feedService;
     private final PostActionService postActionService;
     private final PostVisibilityPolicy visibilityPolicy;
 
@@ -52,6 +53,7 @@ public class PostController {
         request.setAuthorId(userId);
         log.info("Create post | author={} type={}", request.getAuthorId(), request.getPostType());
         PostDoc post = postService.createPost(request);
+        feedService.invalidateCache(userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(post);
     }
 
