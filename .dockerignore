@@ -2,6 +2,9 @@
 .github
 .idea
 .qwen
+.env
+.env.*
+*.env
 target
 monitoring
 k6
