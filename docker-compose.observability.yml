@@ -4,6 +4,14 @@
 name: recommendation-service
 
 services:
+  loki-init:
+    image: busybox:1.36
+    command: ["sh", "-c", "chown -R 10001:10001 /tmp/loki"]
+    volumes:
+      - loki-data:/tmp/loki
+    networks:
+      - recommendation-net
+
   loki:
     image: grafana/loki:2.9.8
     command: -config.file=/etc/loki/loki-config.yml
@@ -14,6 +22,9 @@ services:
       - loki-data:/tmp/loki
     networks:
       - recommendation-net
+    depends_on:
+      loki-init:
+        condition: service_completed_successfully
 
   promtail:
     image: grafana/promtail:2.9.8
@@ -26,6 +37,7 @@ services:
       - loki
     networks:
       - recommendation-net
+      - fitflow-local
 
   prometheus:
     image: prom/prometheus:v2.53.0
@@ -39,10 +51,9 @@ services:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus-data:/prometheus
-    extra_hosts:
-      - "recommendation-service:host-gateway"
     networks:
       - recommendation-net
+      - fitflow-local
 
   alertmanager:
     image: prom/alertmanager:v0.27.0
@@ -54,6 +65,7 @@ services:
       - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     networks:
       - recommendation-net
+      - fitflow-local
 
   node-exporter:
     image: prom/node-exporter:v1.8.2
@@ -63,6 +75,7 @@ services:
       - /:/host:ro,rslave
     networks:
       - recommendation-net
+      - fitflow-local
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.49.1
@@ -75,6 +88,7 @@ services:
       - /var/lib/docker/:/var/lib/docker:ro
     networks:
       - recommendation-net
+      - fitflow-local
 
   grafana:
     image: grafana/grafana:11.0.0
@@ -94,10 +108,14 @@ services:
       - prometheus
     networks:
       - recommendation-net
+      - fitflow-local
 
 networks:
   recommendation-net:
     driver: bridge
+  fitflow-local:
+    name: fitflow-local_default
+    external: true
 
 volumes:
   loki-data:
